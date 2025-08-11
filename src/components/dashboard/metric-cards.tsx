@@ -1,6 +1,6 @@
 'use client';
 
-import { CreditCard, DollarSign, TrendingUp as TrendingUpIcon, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { MessageSquare, Mail, Heart, AlertTriangle, TrendingUp as TrendingUpIcon, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 
@@ -77,28 +77,28 @@ export function MetricCards({ dateRange }: MetricCardsProps) {
 
   const cards = [
     {
-      title: "Contas a Pagar",
+      title: "Ocorrências WhatsApp",
       value: loading ? "..." : metrics.whatsappTotal,
       variation: loading ? undefined : metrics.whatsappVariation,
-      icon: <CreditCard className="h-4 w-4" />,
+      icon: <MessageSquare className="h-4 w-4" />,
     },
     {
-      title: "Contas a Receber",
+      title: "Ocorrências Email",
       value: loading ? "..." : metrics.emailTotal,
       variation: loading ? undefined : metrics.emailVariation,
-      icon: <DollarSign className="h-4 w-4" />,
+      icon: <Mail className="h-4 w-4" />,
     },
     {
-      title: "Taxa de Resolução",
+      title: "Sentimento Médio",
       value: loading ? "..." : metrics.sentimentAvg,
-      icon: <TrendingUpIcon className="h-4 w-4" />,
+      icon: <Heart className="h-4 w-4" />,
       type: 'percentage' as const,
     },
     {
-      title: "Ocorrências Abertas",
-      value: loading ? "..." : metrics.pendingTotal,
-      icon: <AlertTriangle className="h-4 w-4" />,
-      type: 'alert' as const,
+      title: "Risco de Churn",
+      value: loading ? "..." : metrics.churnRisk,
+      icon: <TrendingUpIcon className="h-4 w-4" />,
+      type: 'percentage' as const,
     },
   ];
 

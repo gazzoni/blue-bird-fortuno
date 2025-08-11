@@ -6,7 +6,6 @@ import { ChartsSection } from '@/components/dashboard/charts-section'
 import { RecentOccurrences } from '@/components/dashboard/recent-occurrences'
 import { DateFilter } from '@/components/dashboard/date-filter'
 import { useDateRangeFilter } from '@/hooks/useDateRangeFilter'
-import { SupabaseDebug } from '@/components/debug/supabase-debug'
 
 export default function Dashboard() {
   const {
@@ -21,9 +20,6 @@ export default function Dashboard() {
       <Header title="Dashboard" />
       
       <div className="flex-1 p-6 space-y-6">
-        {/* Debug Panel - Remove after testing */}
-        <SupabaseDebug />
-
         {/* Date Filter */}
         <DateFilter
           dateRange={dateRange}

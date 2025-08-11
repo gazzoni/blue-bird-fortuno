@@ -9,7 +9,7 @@ export interface DashboardMetrics {
   emailTotal: number;
   emailVariation: number;
   sentimentAvg: number;
-  pendingTotal: number;
+  churnRisk: number; // mock percentage until column exists
 }
 
 export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
@@ -18,8 +18,8 @@ export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
     whatsappVariation: 0,
     emailTotal: 0,
     emailVariation: 0,
-    sentimentAvg: 85, // placeholder
-    pendingTotal: 0,
+    sentimentAvg: 85, // mock placeholder until DB column exists
+    churnRisk: 12, // mock placeholder until DB column exists
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,14 +61,6 @@ export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
 
       if (e3 || e4) throw e3 || e4;
 
-      // Pending occurrences: status = 'aberta' (map to Pendente)
-      const { count: pendingTotal, error: e5 } = await supabase
-        .from('occurrences')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'aberta');
-
-      if (e5) throw e5;
-
       const whatsappVariation = whatsappTotal && whatsappTotal > 0
         ? Math.round(((whatsapp24h || 0) / whatsappTotal) * 100)
         : 0;
@@ -81,8 +73,8 @@ export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
         whatsappVariation,
         emailTotal: emailTotal || 0,
         emailVariation,
-        sentimentAvg: 85, // placeholder
-        pendingTotal: pendingTotal || 0,
+        sentimentAvg: 85, // mock placeholder
+        churnRisk: 12, // mock placeholder
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
