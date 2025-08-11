@@ -93,10 +93,10 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
           }));
         }
 
-        // Fetch recent occurrences
+        // Fetch recent occurrences usando campos reais
         const { data: recentData } = await supabase
           .from('occurrences')
-          .select('id, created_at, category, chat_name, status, chat_type')
+          .select('id, created_at, chat_name, status, category, justification')
           .gte('created_at', fromDate)
           .lte('created_at', toDate)
           .order('created_at', { ascending: false })
@@ -106,9 +106,9 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
           id: item.id,
           created_at: item.created_at,
           category: item.category || 'Sem Categoria',
-          chat_name: item.chat_name || 'Chat Desconhecido',
+          chat_name: item.chat_name || 'Sistema Financeiro',
           status: item.status || 'Sem Status',
-          chat_type: item.chat_type || 'Desconhecido'
+          chat_type: 'Financeiro' // Contexto do sistema
         })) || [];
 
         setLineChartData(formattedLineData);

@@ -5,11 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useOccurrenceCharts } from '@/hooks/useOccurrenceCharts';
 
 const COLORS = {
-  'Pendente': '#6b7280',
-  'Em Andamento': '#374151',
-  'Concluído': '#111827',
-  'Cancelado': '#9ca3af',
-  'default': '#d1d5db'
+  'aberta': '#ef4444',      // vermelho para abertas
+  'resolvida': '#22c55e',   // verde para resolvidas  
+  'urgente': '#f59e0b',     // amarelo para urgentes
+  'default': '#6b7280'      // cinza para outros
 };
 
 interface CustomTooltipProps {

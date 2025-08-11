@@ -7,10 +7,9 @@ import { Eye } from 'lucide-react';
 import { useOccurrenceCharts } from '@/hooks/useOccurrenceCharts';
 
 const statusColors = {
-  'Pendente': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  'Em Andamento': 'bg-blue-100 text-blue-800 border-blue-200',
-  'Concluído': 'bg-green-100 text-green-800 border-green-200',
-  'Cancelado': 'bg-red-100 text-red-800 border-red-200',
+  'aberta': 'bg-red-100 text-red-800 border-red-200',
+  'resolvida': 'bg-green-100 text-green-800 border-green-200', 
+  'urgente': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   'default': 'bg-gray-100 text-gray-800 border-gray-200'
 };
 

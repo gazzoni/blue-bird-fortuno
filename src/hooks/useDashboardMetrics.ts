@@ -65,72 +65,72 @@ export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
 
-        // Fetch all data with simpler queries
-        const [whatsappResult, emailResult, pendingResult] = await Promise.all([
-          // WhatsApp occurrences
+        // Fetch all data usando schema real
+        const [contasPagarResult, contasReceberResult, pendingResult] = await Promise.all([
+          // Contas a Pagar
           supabase
             .from('occurrences')
-            .select('id, chat_type, created_at')
-            .in('chat_type', ['group', 'private'])
+            .select('id, category, created_at')
+            .eq('category', 'contas_a_pagar')
             .gte('created_at', fromDate)
             .lte('created_at', toDate),
           
-          // Email occurrences
+          // Contas a Receber  
           supabase
             .from('occurrences')
-            .select('id, channel, created_at')
-            .eq('channel', 'email')
+            .select('id, category, created_at')
+            .eq('category', 'contas_a_receber')
             .gte('created_at', fromDate)
             .lte('created_at', toDate),
           
-          // Pending occurrences
+          // Ocorrências Abertas
           supabase
             .from('occurrences')
             .select('id, status, created_at')
-            .eq('status', 'Pendente')
+            .eq('status', 'aberta')
             .gte('created_at', fromDate)
             .lte('created_at', toDate)
         ]);
 
         // Check for errors
-        if (whatsappResult.error || emailResult.error || pendingResult.error) {
+        if (contasPagarResult.error || contasReceberResult.error || pendingResult.error) {
           console.error('Erros nas queries:', {
-            whatsapp: whatsappResult.error,
-            email: emailResult.error,
+            contasPagar: contasPagarResult.error,
+            contasReceber: contasReceberResult.error,
             pending: pendingResult.error
           });
           throw new Error('Erro ao buscar dados específicos');
         }
 
         // Calculate metrics
-        const whatsappTotal = whatsappResult.data?.length || 0;
-        const emailTotal = emailResult.data?.length || 0;
+        const contasPagarTotal = contasPagarResult.data?.length || 0;
+        const contasReceberTotal = contasReceberResult.data?.length || 0;
         const pendingTotal = pendingResult.data?.length || 0;
 
         // Calculate 24h variations
-        const whatsapp24h = whatsappResult.data?.filter(item => 
+        const contasPagar24h = contasPagarResult.data?.filter(item => 
           new Date(item.created_at) >= yesterday
         ).length || 0;
 
-        const email24h = emailResult.data?.filter(item => 
+        const contasReceber24h = contasReceberResult.data?.filter(item => 
           new Date(item.created_at) >= yesterday
         ).length || 0;
 
         // Calculate variations (24h change)
-        const whatsappVariation = whatsappTotal && whatsappTotal > 0 
-          ? Math.round(((whatsapp24h || 0) / whatsappTotal) * 100) 
+        const contasPagarVariation = contasPagarTotal && contasPagarTotal > 0 
+          ? Math.round(((contasPagar24h || 0) / contasPagarTotal) * 100) 
           : 0;
         
-        const emailVariation = emailTotal && emailTotal > 0 
-          ? Math.round(((email24h || 0) / emailTotal) * 100) 
+        const contasReceberVariation = contasReceberTotal && contasReceberTotal > 0 
+          ? Math.round(((contasReceber24h || 0) / contasReceberTotal) * 100) 
           : 0;
 
         setMetrics({
-          whatsappTotal: whatsappTotal || 0,
-          whatsappVariation,
-          emailTotal: emailTotal || 0,
-          emailVariation,
-          sentimentAvg: 85, // placeholder - would need sentiment analysis
+          whatsappTotal: contasPagarTotal || 0,
+          whatsappVariation: contasPagarVariation,
+          emailTotal: contasReceberTotal || 0,
+          emailVariation: contasReceberVariation,
+          sentimentAvg: 85, // placeholder
           pendingTotal: pendingTotal || 0,
         });
       } catch (supabaseError) {
