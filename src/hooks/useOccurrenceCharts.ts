@@ -35,8 +35,8 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
       setError(null);
 
       try {
-        const fromDate = dateRange?.from?.toISOString() || '1900-01-01';
-        const toDate = dateRange?.to?.toISOString() || '2100-01-01';
+        const fromDate = dateRange?.from?.toISOString() || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const toDate = dateRange?.to?.toISOString() || new Date().toISOString();
 
         // Fetch occurrences by day for line chart using regular query
         const { data: rawData, error: rawError } = await supabase
@@ -81,34 +81,46 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
 
         let formattedPieData: StatusDataPoint[] = [];
         if (!pieError && pieData) {
+          const statusLabel: Record<string, string> = {
+            aberta: 'Pendente',
+            resolvida: 'Concluído',
+            urgente: 'Em Andamento',
+          };
           const statusGroups: { [key: string]: number } = {};
           pieData.forEach(item => {
-            const status = item.status || 'Sem Status';
-            statusGroups[status] = (statusGroups[status] || 0) + 1;
+            const raw = item.status || 'sem_status';
+            const label = statusLabel[raw] ?? raw;
+            statusGroups[label] = (statusGroups[label] || 0) + 1;
           });
 
-          formattedPieData = Object.entries(statusGroups).map(([status, total]) => ({
-            status,
-            total
-          }));
+          formattedPieData = Object.entries(statusGroups).map(([status, total]) => ({ status, total }));
         }
 
         // Fetch recent occurrences usando campos reais
         const { data: recentData } = await supabase
           .from('occurrences')
-          .select('id, created_at, chat_name, status, category, justification')
+          .select('id, created_at, chat_name, status, category, justification, chat_type')
           .gte('created_at', fromDate)
           .lte('created_at', toDate)
           .order('created_at', { ascending: false })
           .limit(5);
 
+        const chatTypeLabel: Record<string, string> = {
+          group: 'Grupo',
+          private: 'Privado',
+        };
+        const statusLabelRecent: Record<string, string> = {
+          aberta: 'Pendente',
+          resolvida: 'Concluído',
+          urgente: 'Em Andamento',
+        };
         const formattedRecentData = recentData?.map(item => ({
           id: item.id,
           created_at: item.created_at,
           category: item.category || 'Sem Categoria',
-          chat_name: item.chat_name || 'Sistema Financeiro',
-          status: item.status || 'Sem Status',
-          chat_type: 'Financeiro' // Contexto do sistema
+          chat_name: item.chat_name || '—',
+          status: statusLabelRecent[item.status as keyof typeof statusLabelRecent] ?? (item.status || 'Sem Status'),
+          chat_type: chatTypeLabel[item.chat_type as keyof typeof chatTypeLabel] ?? (item.chat_type || '—'),
         })) || [];
 
         setLineChartData(formattedLineData);

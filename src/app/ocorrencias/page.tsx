@@ -1,5 +1,6 @@
-'use client'
+ 'use client'
 
+import { useEffect, useState } from 'react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -7,68 +8,71 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Filter, Eye, AlertTriangle, Clock, CheckCircle, X } from 'lucide-react'
+import { Search, Filter, Eye, AlertTriangle, Clock, CheckCircle, X, Loader2 } from 'lucide-react'
 import { useOccurrenceFilters, type Occurrence } from '@/hooks/useOccurrenceFilters'
+import { supabase } from '@/lib/supabase'
 
-// Mock data para demonstração
-const mockOccurrences: Occurrence[] = [
-  {
-    id: 1,
-    justification: "Linguagem ofensiva detectada",
-    evidence: "Mensagem contém termos inadequados",
-    keywords: "ofensa, linguagem imprópria",
-    chatType: "group",
-    chatId: "120363043899842108@g.us",
-    chatName: "Grupo Vendas SP",
-    channel: "WhatsApp",
-    status: "pending",
-    category: "Conduta",
-    createdAt: "2025-01-11T08:30:00Z"
-  },
-  {
-    id: 2,
-    justification: "Possível vazamento de informação confidencial",
-    evidence: "Compartilhamento de dados internos",
-    keywords: "confidencial, dados internos",
-    chatType: "private",
-    chatId: "5511999887766",
-    chatName: "João Silva",
-    channel: "WhatsApp",
-    status: "investigating",
-    category: "Segurança",
-    createdAt: "2025-01-11T07:15:00Z"
-  },
-  {
-    id: 3,
-    justification: "Conversa durante horário não permitido",
-    evidence: "Mensagens enviadas fora do expediente",
-    keywords: "horário, expediente",
-    chatType: "group",
-    chatId: "120363043899842109@g.us",
-    chatName: "Suporte Técnico",
-    channel: "WhatsApp",
-    status: "resolved",
-    category: "Política",
-    createdAt: "2025-01-10T23:45:00Z"
-  }
-]
+// Estado que receberá os dados reais do Supabase
+const useSupabaseOccurrences = () => {
+  const [occurrences, setOccurrences] = useState<Occurrence[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const { data, error } = await supabase
+          .from('occurrences')
+          .select('id, created_at, justification, evidence, key_words, chat_type, chat_id, chat_name, channel, status, category')
+          .order('created_at', { ascending: false })
+          .limit(500)
+        if (error) throw error
+
+        const mapped: Occurrence[] = (data || []).map((row: any) => ({
+          id: row.id,
+          createdAt: row.created_at,
+          justification: row.justification ?? '',
+          evidence: row.evidence ?? '',
+          keywords: row.key_words ?? '',
+          chatType: row.chat_type ?? '',
+          chatId: row.chat_id ?? '',
+          chatName: row.chat_name ?? '',
+          channel: row.channel ?? '',
+          status: row.status ?? '',
+          category: row.category ?? '',
+        }))
+        setOccurrences(mapped)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Erro ao carregar ocorrências')
+        setOccurrences([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  return { occurrences, loading, error }
+}
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case 'pending':
+    case 'aberta':
       return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
         <Clock className="w-3 h-3 mr-1" />
         Pendente
       </Badge>
-    case 'investigating':
+    case 'urgente':
       return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
         <AlertTriangle className="w-3 h-3 mr-1" />
-        Investigando
+        Em Andamento
       </Badge>
-    case 'resolved':
+    case 'resolvida':
       return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
         <CheckCircle className="w-3 h-3 mr-1" />
-        Resolvido
+        Concluído
       </Badge>
     default:
       return <Badge variant="outline">{status}</Badge>
@@ -76,18 +80,12 @@ const getStatusBadge = (status: string) => {
 }
 
 const getCategoryBadge = (category: string) => {
-  const colors = {
-    'Conduta': 'bg-red-50 text-red-700 border-red-200',
-    'Segurança': 'bg-orange-50 text-orange-700 border-orange-200',
-    'Política': 'bg-purple-50 text-purple-700 border-purple-200'
-  }
-  
-  return <Badge variant="outline" className={colors[category as keyof typeof colors] || ''}>
-    {category}
-  </Badge>
+  const label = (category || '').replaceAll('_', ' ') || '—'
+  return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">{label}</Badge>
 }
 
 export default function Occurrences() {
+  const { occurrences, loading, error } = useSupabaseOccurrences()
   const {
     filters,
     filteredOccurrences,
@@ -96,7 +94,7 @@ export default function Occurrences() {
     hasActiveFilters,
     totalCount,
     filteredCount
-  } = useOccurrenceFilters(mockOccurrences);
+  } = useOccurrenceFilters(occurrences);
 
   return (
     <div className="flex flex-col h-full">
@@ -150,9 +148,9 @@ export default function Occurrences() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os status</SelectItem>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="investigating">Investigando</SelectItem>
-                    <SelectItem value="resolved">Resolvido</SelectItem>
+                    <SelectItem value="aberta">Pendente</SelectItem>
+                    <SelectItem value="urgente">Em Andamento</SelectItem>
+                    <SelectItem value="resolvida">Concluído</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -168,9 +166,9 @@ export default function Occurrences() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas as categorias</SelectItem>
-                    <SelectItem value="conduta">Conduta</SelectItem>
-                    <SelectItem value="segurança">Segurança</SelectItem>
-                    <SelectItem value="política">Política</SelectItem>
+                    <SelectItem value="contas_a_pagar">contas_a_pagar</SelectItem>
+                    <SelectItem value="contas_a_receber">contas_a_receber</SelectItem>
+                    <SelectItem value="conciliacao">conciliacao</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -214,7 +212,12 @@ export default function Occurrences() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+            <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center py-16 text-muted-foreground">
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Carregando...
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -277,8 +280,9 @@ export default function Occurrences() {
                 ))}
               </TableBody>
             </Table>
+            )}
             
-            {filteredOccurrences.length === 0 && (
+            {!loading && filteredOccurrences.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <AlertTriangle className="mx-auto h-12 w-12 mb-4" />
                 <h3 className="text-lg font-medium mb-2">Nenhuma ocorrência encontrada</h3>
@@ -298,6 +302,9 @@ export default function Occurrences() {
                   </Button>
                 )}
               </div>
+            )}
+            {error && (
+              <div className="text-center py-4 text-red-600 text-sm">{error}</div>
             )}
           </CardContent>
         </Card>

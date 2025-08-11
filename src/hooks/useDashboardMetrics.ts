@@ -29,122 +29,61 @@ export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
       setLoading(true);
       setError(null);
 
+      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      try {
-        console.log('🔄 Buscando métricas do dashboard...');
-        
-        // Test basic connection first
-        const { count: totalCount, error: basicError } = await supabase
+      // WhatsApp occurrences: chat_type in ('group','private')
+      const [{ count: whatsappTotal, error: e1 }, { count: whatsapp24h, error: e2 }] = await Promise.all([
+        supabase
           .from('occurrences')
-          .select('*', { count: 'exact', head: true });
+          .select('id', { count: 'exact', head: true })
+          .in('chat_type', ['group', 'private']),
+        supabase
+          .from('occurrences')
+          .select('id', { count: 'exact', head: true })
+          .in('chat_type', ['group', 'private'])
+          .gte('created_at', since24h),
+      ]);
 
-        if (basicError) {
-          console.error('❌ Erro na conexão básica:', basicError);
-          throw basicError;
-        }
+      if (e1 || e2) throw e1 || e2;
 
-        console.log(`📊 Total de ocorrências na tabela: ${totalCount || 0}`);
+      // Email occurrences: channel = 'email'
+      const [{ count: emailTotal, error: e3 }, { count: email24h, error: e4 }] = await Promise.all([
+        supabase
+          .from('occurrences')
+          .select('id', { count: 'exact', head: true })
+          .eq('channel', 'email'),
+        supabase
+          .from('occurrences')
+          .select('id', { count: 'exact', head: true })
+          .eq('channel', 'email')
+          .gte('created_at', since24h),
+      ]);
 
-        // If no data, use placeholder values
-        if (!totalCount || totalCount === 0) {
-          console.log('📝 Tabela vazia, usando dados de exemplo');
-          setMetrics({
-            whatsappTotal: 0,
-            whatsappVariation: 0,
-            emailTotal: 0,
-            emailVariation: 0,
-            sentimentAvg: 85,
-            pendingTotal: 0,
-          });
-          return;
-        }
+      if (e3 || e4) throw e3 || e4;
 
-        // Fetch actual metrics
-        const fromDate = dateRange?.from?.toISOString() || '1900-01-01';
-        const toDate = dateRange?.to?.toISOString() || '2100-01-01';
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
+      // Pending occurrences: status = 'aberta' (map to Pendente)
+      const { count: pendingTotal, error: e5 } = await supabase
+        .from('occurrences')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'aberta');
 
-        // Fetch all data usando schema real
-        const [contasPagarResult, contasReceberResult, pendingResult] = await Promise.all([
-          // Contas a Pagar
-          supabase
-            .from('occurrences')
-            .select('id, category, created_at')
-            .eq('category', 'contas_a_pagar')
-            .gte('created_at', fromDate)
-            .lte('created_at', toDate),
-          
-          // Contas a Receber  
-          supabase
-            .from('occurrences')
-            .select('id, category, created_at')
-            .eq('category', 'contas_a_receber')
-            .gte('created_at', fromDate)
-            .lte('created_at', toDate),
-          
-          // Ocorrências Abertas
-          supabase
-            .from('occurrences')
-            .select('id, status, created_at')
-            .eq('status', 'aberta')
-            .gte('created_at', fromDate)
-            .lte('created_at', toDate)
-        ]);
+      if (e5) throw e5;
 
-        // Check for errors
-        if (contasPagarResult.error || contasReceberResult.error || pendingResult.error) {
-          console.error('Erros nas queries:', {
-            contasPagar: contasPagarResult.error,
-            contasReceber: contasReceberResult.error,
-            pending: pendingResult.error
-          });
-          throw new Error('Erro ao buscar dados específicos');
-        }
+      const whatsappVariation = whatsappTotal && whatsappTotal > 0
+        ? Math.round(((whatsapp24h || 0) / whatsappTotal) * 100)
+        : 0;
+      const emailVariation = emailTotal && emailTotal > 0
+        ? Math.round(((email24h || 0) / emailTotal) * 100)
+        : 0;
 
-        // Calculate metrics
-        const contasPagarTotal = contasPagarResult.data?.length || 0;
-        const contasReceberTotal = contasReceberResult.data?.length || 0;
-        const pendingTotal = pendingResult.data?.length || 0;
-
-        // Calculate 24h variations
-        const contasPagar24h = contasPagarResult.data?.filter(item => 
-          new Date(item.created_at) >= yesterday
-        ).length || 0;
-
-        const contasReceber24h = contasReceberResult.data?.filter(item => 
-          new Date(item.created_at) >= yesterday
-        ).length || 0;
-
-        // Calculate variations (24h change)
-        const contasPagarVariation = contasPagarTotal && contasPagarTotal > 0 
-          ? Math.round(((contasPagar24h || 0) / contasPagarTotal) * 100) 
-          : 0;
-        
-        const contasReceberVariation = contasReceberTotal && contasReceberTotal > 0 
-          ? Math.round(((contasReceber24h || 0) / contasReceberTotal) * 100) 
-          : 0;
-
-        setMetrics({
-          whatsappTotal: contasPagarTotal || 0,
-          whatsappVariation: contasPagarVariation,
-          emailTotal: contasReceberTotal || 0,
-          emailVariation: contasReceberVariation,
-          sentimentAvg: 85, // placeholder
-          pendingTotal: pendingTotal || 0,
-        });
-      } catch (supabaseError) {
-        console.error('Erro nas queries Supabase:', supabaseError);
-        // Fallback to mock data if Supabase fails
-        setMetrics({
-          whatsappTotal: 0,
-          whatsappVariation: 0,
-          emailTotal: 0,
-          emailVariation: 0,
-          sentimentAvg: 85,
-          pendingTotal: 0,
-        });
-      }
+      setMetrics({
+        whatsappTotal: whatsappTotal || 0,
+        whatsappVariation,
+        emailTotal: emailTotal || 0,
+        emailVariation,
+        sentimentAvg: 85, // placeholder
+        pendingTotal: pendingTotal || 0,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
