@@ -31,51 +31,90 @@ export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
 
 
       try {
-        // Fetch WhatsApp occurrences (chat_type IN ('group', 'private'))
-        const { count: whatsappTotal, error: whatsappError } = await supabase
+        console.log('🔄 Buscando métricas do dashboard...');
+        
+        // Test basic connection first
+        const { count: totalCount, error: basicError } = await supabase
           .from('occurrences')
-          .select('*', { count: 'exact', head: true })
-          .in('chat_type', ['group', 'private'])
-          .gte('created_at', dateRange?.from?.toISOString() || '1900-01-01')
-          .lte('created_at', dateRange?.to?.toISOString() || '2100-01-01');
+          .select('*', { count: 'exact', head: true });
 
-        // Fetch WhatsApp occurrences last 24h
+        if (basicError) {
+          console.error('❌ Erro na conexão básica:', basicError);
+          throw basicError;
+        }
+
+        console.log(`📊 Total de ocorrências na tabela: ${totalCount || 0}`);
+
+        // If no data, use placeholder values
+        if (!totalCount || totalCount === 0) {
+          console.log('📝 Tabela vazia, usando dados de exemplo');
+          setMetrics({
+            whatsappTotal: 0,
+            whatsappVariation: 0,
+            emailTotal: 0,
+            emailVariation: 0,
+            sentimentAvg: 85,
+            pendingTotal: 0,
+          });
+          return;
+        }
+
+        // Fetch actual metrics
+        const fromDate = dateRange?.from?.toISOString() || '1900-01-01';
+        const toDate = dateRange?.to?.toISOString() || '2100-01-01';
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
-        const { count: whatsapp24h, error: whatsapp24hError } = await supabase
-          .from('occurrences')
-          .select('*', { count: 'exact', head: true })
-          .in('chat_type', ['group', 'private'])
-          .gte('created_at', yesterday.toISOString());
 
-        // Fetch Email occurrences
-        const { count: emailTotal, error: emailError } = await supabase
-          .from('occurrences')
-          .select('*', { count: 'exact', head: true })
-          .eq('channel', 'email')
-          .gte('created_at', dateRange?.from?.toISOString() || '1900-01-01')
-          .lte('created_at', dateRange?.to?.toISOString() || '2100-01-01');
-
-        // Fetch Email occurrences last 24h
-        const { count: email24h, error: email24hError } = await supabase
-          .from('occurrences')
-          .select('*', { count: 'exact', head: true })
-          .eq('channel', 'email')
-          .gte('created_at', yesterday.toISOString());
-
-        // Fetch Pending occurrences
-        const { count: pendingTotal, error: pendingError } = await supabase
-          .from('occurrences')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'Pendente')
-          .gte('created_at', dateRange?.from?.toISOString() || '1900-01-01')
-          .lte('created_at', dateRange?.to?.toISOString() || '2100-01-01');
+        // Fetch all data with simpler queries
+        const [whatsappResult, emailResult, pendingResult] = await Promise.all([
+          // WhatsApp occurrences
+          supabase
+            .from('occurrences')
+            .select('id, chat_type, created_at')
+            .in('chat_type', ['group', 'private'])
+            .gte('created_at', fromDate)
+            .lte('created_at', toDate),
+          
+          // Email occurrences
+          supabase
+            .from('occurrences')
+            .select('id, channel, created_at')
+            .eq('channel', 'email')
+            .gte('created_at', fromDate)
+            .lte('created_at', toDate),
+          
+          // Pending occurrences
+          supabase
+            .from('occurrences')
+            .select('id, status, created_at')
+            .eq('status', 'Pendente')
+            .gte('created_at', fromDate)
+            .lte('created_at', toDate)
+        ]);
 
         // Check for errors
-        if (whatsappError || whatsapp24hError || emailError || email24hError || pendingError) {
-          console.error('Supabase errors:', { whatsappError, whatsapp24hError, emailError, email24hError, pendingError });
-          throw new Error('Erro ao buscar dados do Supabase');
+        if (whatsappResult.error || emailResult.error || pendingResult.error) {
+          console.error('Erros nas queries:', {
+            whatsapp: whatsappResult.error,
+            email: emailResult.error,
+            pending: pendingResult.error
+          });
+          throw new Error('Erro ao buscar dados específicos');
         }
+
+        // Calculate metrics
+        const whatsappTotal = whatsappResult.data?.length || 0;
+        const emailTotal = emailResult.data?.length || 0;
+        const pendingTotal = pendingResult.data?.length || 0;
+
+        // Calculate 24h variations
+        const whatsapp24h = whatsappResult.data?.filter(item => 
+          new Date(item.created_at) >= yesterday
+        ).length || 0;
+
+        const email24h = emailResult.data?.filter(item => 
+          new Date(item.created_at) >= yesterday
+        ).length || 0;
 
         // Calculate variations (24h change)
         const whatsappVariation = whatsappTotal && whatsappTotal > 0 

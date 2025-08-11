@@ -38,50 +38,38 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
         const fromDate = dateRange?.from?.toISOString() || '1900-01-01';
         const toDate = dateRange?.to?.toISOString() || '2100-01-01';
 
-        // Fetch occurrences by day for line chart
-        const { data: lineData, error: lineError } = await supabase
-          .rpc('get_occurrences_by_day', { 
-            start_date: fromDate, 
-            end_date: toDate 
-          })
-          .order('date');
+        // Fetch occurrences by day for line chart using regular query
+        const { data: rawData, error: rawError } = await supabase
+          .from('occurrences')
+          .select('created_at')
+          .gte('created_at', fromDate)
+          .lte('created_at', toDate)
+          .order('created_at');
 
-        // If RPC doesn't exist, try alternative approach
         let formattedLineData: ChartDataPoint[] = [];
-        if (lineError) {
-          console.warn('RPC get_occurrences_by_day not found, using alternative query');
-          // Alternative: group by date using regular query
-          const { data: rawData, error: altError } = await supabase
-            .from('occurrences')
-            .select('created_at')
-            .gte('created_at', fromDate)
-            .lte('created_at', toDate)
-            .order('created_at');
-
-          if (!altError && rawData) {
-            // Group by date manually
-            const dateGroups: { [key: string]: number } = {};
-            rawData.forEach(item => {
-              const date = new Date(item.created_at).toLocaleDateString('pt-BR', { 
-                day: '2-digit', 
-                month: '2-digit' 
-              });
-              dateGroups[date] = (dateGroups[date] || 0) + 1;
-            });
-
-            formattedLineData = Object.entries(dateGroups).map(([date, total]) => ({
-              date,
-              total
-            }));
-          }
-        } else {
-          formattedLineData = lineData?.map((item: { date: string; count: number }) => ({
-            date: new Date(item.date).toLocaleDateString('pt-BR', { 
+        if (!rawError && rawData) {
+          // Group by date manually
+          const dateGroups: { [key: string]: number } = {};
+          rawData.forEach(item => {
+            const date = new Date(item.created_at).toLocaleDateString('pt-BR', { 
               day: '2-digit', 
               month: '2-digit' 
-            }),
-            total: item.count
-          })) || [];
+            });
+            dateGroups[date] = (dateGroups[date] || 0) + 1;
+          });
+
+          formattedLineData = Object.entries(dateGroups)
+            .map(([date, total]) => ({ date, total }))
+            .sort((a, b) => {
+              // Sort by date
+              const [dayA, monthA] = a.date.split('/');
+              const [dayB, monthB] = b.date.split('/');
+              const dateA = new Date(2024, parseInt(monthA) - 1, parseInt(dayA));
+              const dateB = new Date(2024, parseInt(monthB) - 1, parseInt(dayB));
+              return dateA.getTime() - dateB.getTime();
+            });
+        } else {
+          console.error('Erro ao buscar dados para gráfico de linha:', rawError);
         }
 
         // Fetch occurrences by status for pie chart

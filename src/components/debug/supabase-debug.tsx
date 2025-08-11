@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { testSupabaseConnection } from '@/lib/supabase-test';
+import { simpleSupabaseTest } from '@/lib/supabase-simple-test';
 
 export function SupabaseDebug() {
   const [isLoading, setIsLoading] = useState(false);
@@ -47,13 +48,28 @@ export function SupabaseDebug() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <Button 
-            onClick={runTest} 
-            disabled={isLoading}
-            className="bg-black text-white hover:bg-gray-800"
-          >
-            {isLoading ? 'Testando...' : 'Testar Conexão'}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={runTest} 
+              disabled={isLoading}
+              className="bg-black text-white hover:bg-gray-800"
+            >
+              {isLoading ? 'Testando...' : 'Testar Conexão'}
+            </Button>
+            <Button 
+              onClick={async () => {
+                setIsLoading(true);
+                const simpleResult = await simpleSupabaseTest();
+                console.log('Resultado do teste simples:', simpleResult);
+                setIsLoading(false);
+              }} 
+              disabled={isLoading}
+              variant="outline"
+              className="border-gray-300 hover:bg-gray-50"
+            >
+              Teste Simples
+            </Button>
+          </div>
 
           {result && (
             <div className="mt-4 space-y-4">
