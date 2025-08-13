@@ -29,14 +29,24 @@ export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
       setLoading(true);
       setError(null);
 
-      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Use date range if provided, otherwise use default last 7 days
+      const now = new Date();
+      const defaultFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const fromDate = dateRange?.from || defaultFrom;
+      const toDate = dateRange?.to || now;
 
-      // WhatsApp occurrences: chat_type in ('group','private')
+      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const fromDateISO = fromDate.toISOString();
+      const toDateISO = toDate.toISOString();
+
+      // WhatsApp occurrences: chat_type in ('group','private') filtered by date range
       const [{ count: whatsappTotal, error: e1 }, { count: whatsapp24h, error: e2 }] = await Promise.all([
         supabase
           .from('occurrences')
           .select('id', { count: 'exact', head: true })
-          .in('chat_type', ['group', 'private']),
+          .in('chat_type', ['group', 'private'])
+          .gte('created_at', fromDateISO)
+          .lte('created_at', toDateISO),
         supabase
           .from('occurrences')
           .select('id', { count: 'exact', head: true })
@@ -46,12 +56,14 @@ export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
 
       if (e1 || e2) throw e1 || e2;
 
-      // Email occurrences: channel = 'email'
+      // Email occurrences: channel = 'email' filtered by date range
       const [{ count: emailTotal, error: e3 }, { count: email24h, error: e4 }] = await Promise.all([
         supabase
           .from('occurrences')
           .select('id', { count: 'exact', head: true })
-          .eq('channel', 'email'),
+          .eq('channel', 'email')
+          .gte('created_at', fromDateISO)
+          .lte('created_at', toDateISO),
         supabase
           .from('occurrences')
           .select('id', { count: 'exact', head: true })
