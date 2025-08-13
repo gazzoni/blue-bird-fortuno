@@ -59,7 +59,19 @@ const useSupabaseOccurrences = (
         if (error) throw error
         setTotalCount(count || 0)
 
-        const mapped: Occurrence[] = (data || []).map((row: any) => ({
+        const mapped: Occurrence[] = (data || []).map((row: {
+          id: number;
+          created_at: string;
+          justification: string | null;
+          evidence: string | null;
+          key_words: string | null;
+          chat_type: string | null;
+          chat_id: string | null;
+          chat_name: string | null;
+          channel: string | null;
+          status: string | null;
+          category: string | null;
+        }) => ({
           id: row.id,
           createdAt: row.created_at,
           justification: row.justification ?? '',

@@ -1,6 +1,6 @@
 'use client';
 
-import { MessageSquare, Mail, Heart, AlertTriangle, TrendingUp as TrendingUpIcon, TrendingUp, TrendingDown } from 'lucide-react';
+import { MessageSquare, Mail, Heart, TrendingUp as TrendingUpIcon, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 
