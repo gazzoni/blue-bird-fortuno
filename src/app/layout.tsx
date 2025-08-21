@@ -4,7 +4,7 @@ import "./globals.css";
 import { Sidebar } from "@/components/layout/sidebar";
 import { RefreshButton } from "@/components/layout/refresh-button";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
-import { OfflineIndicator } from "@/components/pwa/offline-indicator";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,7 +63,6 @@ export default function RootLayout({
           </main>
           <RefreshButton />
           <InstallPrompt />
-          <OfflineIndicator />
         </div>
       </body>
     </html>
