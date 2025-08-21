@@ -10,14 +10,16 @@ export interface Company {
 export interface Occurrence {
   id: number;
   created_at: string;
-  justification: string;
-  evidence: string;
-  key_words: string;
-  chat_type: string;
   chat_id: string;
   chat_name: string;
-  channel: string;
+  client_name: string;
   status: string;
+  description: string;
+  key_words: string;
+  messages: Record<string, unknown>; // jsonb
+  channel: string;
+  gate_kepper: boolean;
+  squad: string;
   category: string;
 }
 

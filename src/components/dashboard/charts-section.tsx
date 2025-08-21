@@ -1,15 +1,63 @@
 'use client';
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, Tooltip, Legend, Dot } from 'recharts';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { ChartContainer, ChartConfig } from '@/components/ui/chart';
+import { TrendingUp } from 'lucide-react';
 import { useOccurrenceCharts } from '@/hooks/useOccurrenceCharts';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const COLORS = {
-  'aberta': '#ef4444',      // vermelho para abertas
-  'resolvida': '#22c55e',   // verde para resolvidas  
-  'urgente': '#f59e0b',     // amarelo para urgentes
+  'Aberto': '#7dd3fc',      // sky-300 para aberto
+  'Resolvido': '#bbf7d0',   // verde claro para resolvido  
   'default': '#6b7280'      // cinza para outros
 };
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const SQUAD_COLORS = {
+  'Elite do Fluxo': '#0ea5e9',        // sky-500
+  'Força Tática Financeira': '#0284c7' // sky-600
+};
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const BLUE_GRADIENT = ['#7dd3fc', '#38bdf8', '#0ea5e9', '#0284c7', '#0369a1', '#075985', '#0c4a6e', '#164e63', '#155e75', '#0f172a'];
+
+// Chart configs seguindo padrão shadcn/ui
+const chartConfigBar = {
+  total: {
+    label: "Ocorrências",
+    color: "#0ea5e9", // sky-500
+  },
+} satisfies ChartConfig;
+
+const chartConfigLine = {
+  total: {
+    label: "Ocorrências",
+    color: "#0ea5e9", // sky-500
+  },
+} satisfies ChartConfig;
+
+const chartConfigSquad = {
+  eliteDoFluxo: {
+    label: "Elite do Fluxo",
+    color: "#0ea5e9", // sky-500
+  },
+  forcaTaticaFinanceira: {
+    label: "Força Tática Financeira", 
+    color: "#0284c7", // sky-600
+  },
+} satisfies ChartConfig;
+
+const chartConfigStatus = {
+  aberto: {
+    label: "Aberto",
+    color: "#0ea5e9", // sky-500
+  },
+  resolvido: {
+    label: "Resolvido", 
+    color: "#0284c7", // sky-600
+  },
+} satisfies ChartConfig;
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -20,12 +68,13 @@ interface CustomTooltipProps {
   label?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
-        <p className="text-black font-medium">{`${label}`}</p>
-        <p className="text-gray-600">
+      <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+        <p className="text-popover-foreground font-medium">{`${label}`}</p>
+        <p className="text-muted-foreground">
           {`Total: ${payload[0].value}`}
         </p>
       </div>
@@ -34,40 +83,34 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   return null;
 }
 
-interface PieTooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    payload: {
-      status: string;
-      total: number;
-    };
-  }>;
-}
 
-function PieTooltip({ active, payload }: PieTooltipProps) {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
-        <p className="text-black font-medium">{data.status}</p>
-        <p className="text-gray-600">
-          {`Total: ${data.total}`}
-        </p>
-      </div>
-    );
-  }
-  return null;
-}
 
 interface ChartsSectionProps {
   dateRange?: { from?: Date; to?: Date };
 }
 
 export function ChartsSection({ dateRange }: ChartsSectionProps) {
-  const { lineChartData, pieChartData, loading, error } = useOccurrenceCharts(dateRange);
+  const { lineChartData, statusByDayData, squadChartData, clientChartData, loading, error } = useOccurrenceCharts(dateRange);
 
   if (error) {
     return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="bg-white border-gray-200">
+            <CardContent className="p-6">
+              <div className="text-center text-muted-foreground">
+                Erro ao carregar dados do gráfico
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white border-gray-200">
+            <CardContent className="p-6">
+              <div className="text-center text-muted-foreground">
+                Erro ao carregar dados do gráfico
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="bg-white border-gray-200">
           <CardContent className="p-6">
@@ -83,103 +126,342 @@ export function ChartsSection({ dateRange }: ChartsSectionProps) {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     );
   }
 
   return (
+    <div className="space-y-6">
+      {/* First Row: Original charts */}
     <div className="grid gap-4 md:grid-cols-2">
-      {/* Line Chart */}
-      <Card className="bg-white border-gray-200">
+      {/* Total Line Chart - Padrão shadcn/ui */}
+      <Card className="min-h-[500px]">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-black">
-            Ocorrências por Período (7 dias)
-          </CardTitle>
+          <CardTitle>Total de Ocorrências</CardTitle>
+          <CardDescription>Evolução diária das ocorrências</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-gray-500">Carregando gráfico...</div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={lineChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis 
-                    dataKey="date" 
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                    axisLine={{ stroke: '#d1d5db' }}
-                  />
-                  <YAxis 
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
-                    axisLine={{ stroke: '#d1d5db' }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Line 
-                    type="monotone" 
-                    dataKey="total" 
-                    stroke="#000000" 
-                    strokeWidth={2}
-                    dot={{ fill: '#000000', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, stroke: '#000000', strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
+        <CardContent className="h-[400px]">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-muted-foreground">Carregando gráfico...</div>
+            </div>
+          ) : (
+            <ChartContainer config={chartConfigLine}>
+              <LineChart
+                accessibilityLayer
+                data={lineChartData}
+                margin={{
+                  top: 24,
+                  left: 24,
+                  right: 24,
+                }}
+              >
+                <CartesianGrid vertical={true} horizontal={true} strokeOpacity={0.2} />
+                <YAxis 
+                  domain={[-1, (dataMax: number) => dataMax + 1]}
+                  tick={{ fontSize: 0 }}
+                  axisLine={false}
+                  tickCount={10}
+                  width={0}
+                />
+                <Tooltip 
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      // Pega a data do payload se o label não estiver correto
+                      const date = payload[0]?.payload?.date || label;
+                      return (
+                        <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+                          <p className="text-popover-foreground font-medium">{date}</p>
+                          {payload.map((entry, index) => (
+                            <p key={index} className="text-muted-foreground">
+                              {`${entry.name}: ${entry.value}`}
+                            </p>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Line
+                  dataKey="total"
+                  type="natural"
+                  stroke="var(--color-total)"
+                  strokeWidth={2}
+                  dot={({ payload, ...props }) => {
+                    return (
+                      <Dot
+                        key={payload.date}
+                        r={5}
+                        cx={props.cx}
+                        cy={props.cy}
+                        fill="var(--color-total)"
+                        stroke="var(--color-total)"
+                      />
+                    )
+                  }}
+                />
+              </LineChart>
+            </ChartContainer>
+          )}
         </CardContent>
+        <CardFooter className="flex-col items-start gap-2 text-sm">
+          <div className="flex gap-2 leading-none font-medium">
+            Baseado no período selecionado <TrendingUp className="h-4 w-4" />
+          </div>
+          <div className="text-muted-foreground leading-none">
+            Mostrando ocorrências dos últimos dias
+          </div>
+        </CardFooter>
       </Card>
 
-      {/* Pie Chart */}
-      <Card className="bg-white border-gray-200">
+      {/* Status Stacked Bar Chart */}
+      <Card className="min-h-[500px]">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-black">
-            Status das Ocorrências
-          </CardTitle>
+          <CardTitle>Ocorrências por Status</CardTitle>
+          <CardDescription>Status das ocorrências por dia</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
+        <CardContent className="h-[400px]">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-muted-foreground">Carregando gráfico...</div>
+            </div>
+          ) : (
+            <ChartContainer config={chartConfigStatus}>
+              <BarChart accessibilityLayer data={statusByDayData}>
+                <CartesianGrid vertical={true} horizontal={true} strokeOpacity={0.2} />
+                <XAxis
+                  dataKey="date"
+                  tickLine={false}
+                  tickMargin={10}
+                  axisLine={false}
+                  tickFormatter={(value) => value}
+                />
+                <YAxis 
+                  domain={[0, (dataMax: number) => dataMax + 1]}
+                  tick={{ fontSize: 0 }}
+                  axisLine={false}
+                  tickCount={10}
+                  width={0}
+                />
+                <Tooltip 
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+                          <p className="text-popover-foreground font-medium">{`${label}`}</p>
+                          {payload.map((entry, index) => (
+                            <p key={index} className="text-muted-foreground">
+                              {`${entry.name}: ${entry.value}`}
+                            </p>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                  cursor={{ fill: 'rgba(14, 165, 233, 0.05)' }}
+                />
+                <Legend 
+                  verticalAlign="top"
+                  height={36}
+                  iconType="rect"
+                  wrapperStyle={{ 
+                    fontSize: '12px',
+                    color: '#64748b'
+                  }}
+                />
+                <Bar
+                  dataKey="aberto"
+                  stackId="a"
+                  fill="var(--color-aberto)"
+                  radius={[0, 0, 4, 4]}
+                />
+                <Bar
+                  dataKey="resolvido"
+                  stackId="a"
+                  fill="var(--color-resolvido)"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ChartContainer>
+          )}
+        </CardContent>
+        <CardFooter className="flex-col items-start gap-2 text-sm">
+          <div className="flex gap-2 leading-none font-medium">
+            Acompanhe a evolução diária dos status <TrendingUp className="h-4 w-4" />
+          </div>
+          <div className="text-muted-foreground leading-none">
+            Mostrando status aberto e resolvido por dia
+          </div>
+        </CardFooter>
+      </Card>
+      </div>
+
+      {/* Second Row: New charts */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Squad Line Chart - Padrão shadcn/ui */}
+        <Card className="min-h-[500px]">
+          <CardHeader>
+            <CardTitle>Ocorrências por Squad</CardTitle>
+            <CardDescription>Comparativo entre squads por período</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[400px]">
             {loading ? (
               <div className="flex items-center justify-center h-full">
-                <div className="text-gray-500">Carregando gráfico...</div>
+                <div className="text-muted-foreground">Carregando gráfico...</div>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieChartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="total"
-                    label={(props: { status?: string; percent?: number }) => 
-                      `${props.status || ''} ${props.percent ? (props.percent * 100).toFixed(0) : '0'}%`
-                    }
-                  >
-                    {pieChartData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={COLORS[entry.status as keyof typeof COLORS] || COLORS.default} 
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<PieTooltip />} />
-                  <Legend 
-                    wrapperStyle={{ 
-                      paddingTop: '20px',
-                      fontSize: '12px',
-                      color: '#6b7280'
+              <ChartContainer config={chartConfigSquad}>
+                <LineChart
+                  accessibilityLayer
+                  data={squadChartData}
+                  margin={{
+                    top: 24,
+                    left: 24,
+                    right: 24,
+                  }}
+                >
+                  <CartesianGrid vertical={true} horizontal={true} strokeOpacity={0.2} />
+                  <YAxis 
+                    domain={[-1, (dataMax: number) => dataMax + 1]}
+                    tick={{ fontSize: 0 }}
+                    axisLine={false}
+                    tickCount={10}
+                    width={0}
+                  />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        // Pega a data do payload se o label não estiver correto
+                        const date = payload[0]?.payload?.date || label;
+                        return (
+                          <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+                            <p className="text-popover-foreground font-medium">{date}</p>
+                            {payload.map((entry, index) => (
+                              <p key={index} className="text-muted-foreground">
+                                {`${entry.name}: ${entry.value}`}
+                              </p>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return null;
                     }}
                   />
-                </PieChart>
-              </ResponsiveContainer>
+                  <Line
+                    dataKey="Elite do Fluxo"
+                    type="natural"
+                    stroke="var(--color-eliteDoFluxo)"
+                    strokeWidth={2}
+                    dot={({ payload, ...props }) => {
+                      return (
+                        <Dot
+                          key={payload.date}
+                          r={5}
+                          cx={props.cx}
+                          cy={props.cy}
+                          fill="var(--color-eliteDoFluxo)"
+                          stroke="var(--color-eliteDoFluxo)"
+                        />
+                      )
+                    }}
+                  />
+                  <Line 
+                    dataKey="Força Tática Financeira"
+                    type="natural" 
+                    stroke="var(--color-forcaTaticaFinanceira)"
+                    strokeWidth={2}
+                    dot={({ payload, ...props }) => {
+                      return (
+                        <Dot
+                          key={payload.date}
+                          r={5}
+                          cx={props.cx}
+                          cy={props.cy}
+                          fill="var(--color-forcaTaticaFinanceira)"
+                          stroke="var(--color-forcaTaticaFinanceira)"
+                        />
+                      )
+                    }}
+                  />
+                </LineChart>
+              </ChartContainer>
             )}
+          </CardContent>
+          <CardFooter className="flex-col items-start gap-2 text-sm">
+            <div className="flex gap-2 leading-none font-medium">
+              Performance comparativa dos squads <TrendingUp className="h-4 w-4" />
+            </div>
+            <div className="text-muted-foreground leading-none">
+              Mostrando evolução de cada squad no período
           </div>
-        </CardContent>
+          </CardFooter>
       </Card>
+
+        {/* Client Bar Chart - Padrão shadcn/ui */}
+        <Card className="min-h-[500px]">
+        <CardHeader>
+            <CardTitle>Ocorrências por Cliente</CardTitle>
+            <CardDescription>Top clientes com mais ocorrências</CardDescription>
+        </CardHeader>
+          <CardContent className="h-[400px]">
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-muted-foreground">Carregando gráfico...</div>
+              </div>
+            ) : (
+              <ChartContainer config={chartConfigBar}>
+                <BarChart accessibilityLayer data={clientChartData}>
+                  <CartesianGrid vertical={true} horizontal={true} strokeOpacity={0.2} />
+                  <XAxis
+                    dataKey="client"
+                    tickLine={false}
+                    tickMargin={10}
+                    axisLine={false}
+                    tickFormatter={(value) => value.length > 10 ? value.slice(0, 10) + '...' : value}
+                  />
+                  <YAxis 
+                    domain={[0, (dataMax: number) => dataMax + 1]}
+                    tick={{ fontSize: 0 }}
+                    axisLine={false}
+                    tickCount={10}
+                    width={0}
+                  />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+                            <p className="text-popover-foreground font-medium">{`${label}`}</p>
+                            {payload.map((entry, index) => (
+                              <p key={index} className="text-muted-foreground">
+                                {`Ocorrências: ${entry.value}`}
+                              </p>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                    cursor={{ fill: 'rgba(14, 165, 233, 0.05)' }}
+                  />
+                  <Bar dataKey="total" fill="var(--color-total)" radius={8} />
+                </BarChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+          <CardFooter className="flex-col items-start gap-2 text-sm">
+            <div className="flex gap-2 leading-none font-medium">
+              Baseado nos dados do período selecionado <TrendingUp className="h-4 w-4" />
+            </div>
+            <div className="text-muted-foreground leading-none">
+              Mostrando os principais clientes com ocorrências
+          </div>
+          </CardFooter>
+      </Card>
+      </div>
     </div>
   );
 }

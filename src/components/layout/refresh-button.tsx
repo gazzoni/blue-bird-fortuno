@@ -13,7 +13,7 @@ export function RefreshButton() {
       size="icon"
       onClick={refreshAll}
       disabled={isRefreshing}
-      className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg bg-black hover:bg-gray-800 text-white z-50 border-2 border-gray-200"
+      className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground z-50 border-2 border-border"
     >
       <RefreshCw
         className={cn(

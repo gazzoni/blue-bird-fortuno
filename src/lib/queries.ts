@@ -1,41 +1,41 @@
 export const dashboardQueries = {
   whatsappOccurrences: `
     SELECT COUNT(*) as total 
-    FROM occurrences 
-    WHERE chat_type IN ('Grupo', 'Privado')
+    FROM "new-occurrences" 
+    WHERE channel = 'Whatsapp'
   `,
   
   whatsappOccurrences24h: `
     SELECT COUNT(*) as total 
-    FROM occurrences 
-    WHERE chat_type IN ('Grupo', 'Privado')
+    FROM "new-occurrences" 
+    WHERE channel = 'Whatsapp'
     AND created_at >= NOW() - INTERVAL '24 hours'
   `,
   
   emailOccurrences: `
     SELECT COUNT(*) as total 
-    FROM occurrences 
+    FROM "new-occurrences" 
     WHERE channel = 'email'
   `,
   
   emailOccurrences24h: `
     SELECT COUNT(*) as total 
-    FROM occurrences 
+    FROM "new-occurrences" 
     WHERE channel = 'email'
     AND created_at >= NOW() - INTERVAL '24 hours'
   `,
   
   pendingOccurrences: `
     SELECT COUNT(*) as total 
-    FROM occurrences 
-    WHERE status = 'Pendente'
+    FROM "new-occurrences" 
+    WHERE status = 'aberto'
   `,
   
   occurrencesByDay: `
     SELECT 
       DATE(created_at) as date,
       COUNT(*) as total
-    FROM occurrences 
+    FROM "new-occurrences" 
     WHERE created_at >= NOW() - INTERVAL '7 days'
     GROUP BY DATE(created_at)
     ORDER BY date
@@ -45,7 +45,7 @@ export const dashboardQueries = {
     SELECT 
       status,
       COUNT(*) as total
-    FROM occurrences 
+    FROM "new-occurrences" 
     GROUP BY status
   `,
   
@@ -56,8 +56,8 @@ export const dashboardQueries = {
       category,
       chat_name,
       status,
-      chat_type
-    FROM occurrences 
+      squad
+    FROM "new-occurrences" 
     ORDER BY created_at DESC 
     LIMIT 5
   `

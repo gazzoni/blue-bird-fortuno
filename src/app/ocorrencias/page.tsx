@@ -8,21 +8,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Filter, Eye, AlertTriangle, Clock, CheckCircle, X, Loader2 } from 'lucide-react'
+import { Search, Filter, Eye, AlertTriangle, Clock, CheckCircle, X, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { FeedbackModal } from '@/components/feedback/feedback-modal'
+import { OccurrenceDetails } from '@/components/occurrences/occurrence-details'
 import type { Occurrence as OccurrenceFiltersType } from '@/hooks/useOccurrenceFilters'
 import { supabase } from '@/lib/supabase'
 
 // Estado que receberá os dados reais do Supabase
 type Occurrence = OccurrenceFiltersType
 
+type SortField = 'created_at' | 'status' | 'client_name' | 'squad' | 'category'
+type SortDirection = 'asc' | 'desc'
+
 const useSupabaseOccurrences = (
   params: {
     search: string;
-    status: 'all' | 'aberta' | 'urgente' | 'resolvida';
-    category: 'all' | 'contas_a_pagar' | 'contas_a_receber' | 'conciliacao';
-    chatType: 'all' | 'group' | 'private';
+    status: 'all' | 'aberto' | 'resolvido';
+    category: 'all' | 'contas a pagar' | 'contas a receber' | 'conciliação bancária';
+    squad: 'all' | string;
     page: number;
     pageSize: number;
+    sortField: SortField;
+    sortDirection: SortDirection;
   }
 ) => {
   const [occurrences, setOccurrences] = useState<Occurrence[]>([])
@@ -40,49 +48,58 @@ const useSupabaseOccurrences = (
         const to = from + params.pageSize - 1
 
         let query = supabase
-          .from('occurrences')
+          .from('new-occurrences')
           .select(
-            'id, created_at, justification, evidence, key_words, chat_type, chat_id, chat_name, channel, status, category',
+            'id, created_at, description, key_words, chat_id, chat_name, client_name, channel, status, category, squad, gate_kepper, messages',
             { count: 'exact' }
           )
-          .order('created_at', { ascending: false })
+          .order(params.sortField, { ascending: params.sortDirection === 'asc' })
           .range(from, to)
 
         if (params.status !== 'all') query = query.eq('status', params.status)
         if (params.category !== 'all') query = query.eq('category', params.category)
-        if (params.chatType !== 'all') query = query.eq('chat_type', params.chatType)
+        if (params.squad !== 'all') query = query.eq('squad', params.squad)
         if (params.search.trim().length > 0) {
-          query = query.ilike('justification', `%${params.search.trim()}%`)
+          const searchTerm = params.search.trim()
+          query = query.or(`description.ilike.%${searchTerm}%,chat_name.ilike.%${searchTerm}%,client_name.ilike.%${searchTerm}%,key_words.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%`)
         }
 
         const { data, error, count } = await query
-        if (error) throw error
+        
+        if (error) {
+          throw error
+        }
+        
         setTotalCount(count || 0)
 
         const mapped: Occurrence[] = (data || []).map((row: {
           id: number;
           created_at: string;
-          justification: string | null;
-          evidence: string | null;
+          description: string | null;
           key_words: string | null;
-          chat_type: string | null;
           chat_id: string | null;
           chat_name: string | null;
+          client_name: string | null;
           channel: string | null;
           status: string | null;
           category: string | null;
+          squad: string | null;
+          gate_kepper: boolean | null;
+          messages: Record<string, unknown> | null;
         }) => ({
           id: row.id,
           createdAt: row.created_at,
-          justification: row.justification ?? '',
-          evidence: row.evidence ?? '',
+          description: row.description ?? '',
           keywords: row.key_words ?? '',
-          chatType: row.chat_type ?? '',
           chatId: row.chat_id ?? '',
           chatName: row.chat_name ?? '',
+          clientName: row.client_name ?? '',
           channel: row.channel ?? '',
           status: row.status ?? '',
           category: row.category ?? '',
+          squad: row.squad ?? '',
+          gateKepper: row.gate_kepper ?? false,
+          messages: row.messages ?? {},
         }))
         setOccurrences(mapped)
       } catch (e) {
@@ -98,9 +115,11 @@ const useSupabaseOccurrences = (
     params.search,
     params.status,
     params.category,
-    params.chatType,
+    params.squad,
     params.page,
     params.pageSize,
+    params.sortField,
+    params.sortDirection,
   ])
 
   return { occurrences, loading, error, totalCount }
@@ -108,20 +127,15 @@ const useSupabaseOccurrences = (
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case 'aberta':
+    case 'aberto':
       return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
         <Clock className="w-3 h-3 mr-1" />
-        Pendente
+        Aberto
       </Badge>
-    case 'urgente':
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-        <AlertTriangle className="w-3 h-3 mr-1" />
-        Em Andamento
-      </Badge>
-    case 'resolvida':
+    case 'resolvido':
       return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
         <CheckCircle className="w-3 h-3 mr-1" />
-        Concluído
+        Resolvido
       </Badge>
     default:
       return <Badge variant="outline">{status}</Badge>
@@ -135,29 +149,72 @@ const getCategoryBadge = (category: string) => {
 
 export default function Occurrences() {
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'aberta' | 'urgente' | 'resolvida'>('all')
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'contas_a_pagar' | 'contas_a_receber' | 'conciliacao'>('all')
-  const [chatTypeFilter, setChatTypeFilter] = useState<'all' | 'group' | 'private'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'aberto' | 'resolvido'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'contas a pagar' | 'contas a receber' | 'conciliação bancária'>('all')
+  const [squadFilter, setSquadFilter] = useState<'all' | string>('all')
   const [page, setPage] = useState(1)
+  const [sortField, setSortField] = useState<SortField>('created_at')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const [selectedOccurrence, setSelectedOccurrence] = useState<Occurrence | null>(null)
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
   const pageSize = 50
 
   const { occurrences, loading, error, totalCount } = useSupabaseOccurrences({
     search,
     status: statusFilter,
     category: categoryFilter,
-    chatType: chatTypeFilter,
+    squad: squadFilter,
     page,
     pageSize,
+    sortField,
+    sortDirection,
   })
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
-  const hasActiveFilters = search !== '' || statusFilter !== 'all' || categoryFilter !== 'all' || chatTypeFilter !== 'all'
+  const hasActiveFilters = search !== '' || statusFilter !== 'all' || categoryFilter !== 'all' || squadFilter !== 'all'
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+    setPage(1)
+  }
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4" />
+    }
+    return sortDirection === 'asc' ? 
+      <ArrowUp className="w-4 h-4" /> : 
+      <ArrowDown className="w-4 h-4" />
+  }
+
+  const handleOpenDetails = (occurrence: Occurrence) => {
+    setSelectedOccurrence(occurrence)
+    setIsDetailsOpen(true)
+  }
+
+  const handleOpenFeedback = () => {
+    setIsFeedbackOpen(true)
+  }
+
+  const handleFeedbackSubmit = async (feedback: { type: 'like' | 'dislike'; comment: string; occurrenceId: number }) => {
+    console.log('Feedback enviado:', feedback)
+    // TODO: Integrar com banco de dados
+    // Aqui você pode implementar a integração com o Supabase posteriormente
+  }
 
   const clearFilters = () => {
     setSearch('')
     setStatusFilter('all')
     setCategoryFilter('all')
-    setChatTypeFilter('all')
+    setSquadFilter('all')
+    setSortField('created_at')
+    setSortDirection('desc')
     setPage(1)
   }
 
@@ -188,62 +245,65 @@ export default function Occurrences() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="flex flex-col gap-4">
+              {/* Campo de busca - largura completa */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Buscar</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input 
-                      placeholder="Buscar por justificativa, chat..." 
-                      className="pl-10"
+                      placeholder="Buscar por descrição, chat, cliente, palavras-chave..." 
+                      className="pl-10 w-full"
                       value={search}
                       onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                     />
                 </div>
               </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Status</label>
-                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as typeof statusFilter); setPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os status</SelectItem>
-                    <SelectItem value="aberta">Pendente</SelectItem>
-                    <SelectItem value="urgente">Em Andamento</SelectItem>
-                    <SelectItem value="resolvida">Concluído</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Categoria</label>
-                <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v as typeof categoryFilter); setPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas as categorias" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as categorias</SelectItem>
-                    <SelectItem value="contas_a_pagar">contas_a_pagar</SelectItem>
-                    <SelectItem value="contas_a_receber">contas_a_receber</SelectItem>
-                    <SelectItem value="conciliacao">conciliacao</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Tipo de Chat</label>
-                <Select value={chatTypeFilter} onValueChange={(v) => { setChatTypeFilter(v as typeof chatTypeFilter); setPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os tipos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os tipos</SelectItem>
-                    <SelectItem value="group">Grupo</SelectItem>
-                    <SelectItem value="private">Privado</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              {/* Filtros com largura fixa */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as typeof statusFilter); setPage(1); }}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Todos os status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      <SelectItem value="aberto">Aberto</SelectItem>
+                      <SelectItem value="resolvido">Resolvido</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Categoria</label>
+                  <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v as typeof categoryFilter); setPage(1); }}>
+                    <SelectTrigger className="w-[220px]">
+                      <SelectValue placeholder="Todas as categorias" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as categorias</SelectItem>
+                      <SelectItem value="contas a pagar">Contas a Pagar</SelectItem>
+                      <SelectItem value="contas a receber">Contas a Receber</SelectItem>
+                      <SelectItem value="conciliação bancária">Conciliação Bancária</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Squad</label>
+                  <Select value={squadFilter} onValueChange={(v) => { setSquadFilter(v); setPage(1); }}>
+                    <SelectTrigger className="w-[240px]">
+                      <SelectValue placeholder="Todos os squads" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os squads</SelectItem>
+                      <SelectItem value="Elite do Fluxo">Elite do Fluxo</SelectItem>
+                      <SelectItem value="Força Tática Financeira">Força Tática Financeira</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             
@@ -274,11 +334,62 @@ export default function Occurrences() {
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
-                  <TableHead>Data/Hora</TableHead>
-                  <TableHead>Chat</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Justificativa</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-auto p-0 font-medium hover:bg-transparent"
+                      onClick={() => handleSort('created_at')}
+                    >
+                      Data/Hora
+                      {getSortIcon('created_at')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-auto p-0 font-medium hover:bg-transparent"
+                      onClick={() => handleSort('client_name')}
+                    >
+                      Chat/Cliente
+                      {getSortIcon('client_name')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-auto p-0 font-medium hover:bg-transparent"
+                      onClick={() => handleSort('squad')}
+                    >
+                      Squad
+                      {getSortIcon('squad')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-auto p-0 font-medium hover:bg-transparent"
+                      onClick={() => handleSort('category')}
+                    >
+                      Categoria
+                      {getSortIcon('category')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-auto p-0 font-medium hover:bg-transparent"
+                      onClick={() => handleSort('status')}
+                    >
+                      Status
+                      {getSortIcon('status')}
+                    </Button>
+                  </TableHead>
                   <TableHead>Palavras-chave</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -294,16 +405,21 @@ export default function Occurrences() {
                       <div>
                         <div className="font-medium">{occurrence.chatName}</div>
                         <div className="text-sm text-muted-foreground">
-                          {occurrence.chatType === 'group' ? 'Grupo' : 'Privado'}
+                          {occurrence.clientName}
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        {occurrence.squad || '—'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {getCategoryBadge(occurrence.category)}
                     </TableCell>
                     <TableCell className="max-w-xs">
-                      <div className="truncate" title={occurrence.justification}>
-                        {occurrence.justification}
+                      <div className="truncate" title={occurrence.description}>
+                        {occurrence.description}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -323,7 +439,11 @@ export default function Occurrences() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button size="sm" variant="outline">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleOpenDetails(occurrence)}
+                      >
                         <Eye className="w-4 h-4 mr-1" />
                         Detalhes
                       </Button>
@@ -370,6 +490,34 @@ export default function Occurrences() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Details Modal */}
+      <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <SheetContent className="w-[900px] sm:max-w-[900px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Detalhes da Ocorrência</SheetTitle>
+          </SheetHeader>
+          
+          <div className="mt-6 pb-6">
+            {selectedOccurrence && (
+              <OccurrenceDetails 
+                occurrence={selectedOccurrence} 
+                onFeedbackClick={handleOpenFeedback}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Feedback Modal */}
+      {selectedOccurrence && (
+        <FeedbackModal
+          isOpen={isFeedbackOpen}
+          onClose={() => setIsFeedbackOpen(false)}
+          occurrenceId={selectedOccurrence.id}
+          onSubmit={handleFeedbackSubmit}
+        />
+      )}
     </div>
   )
 }

@@ -4,15 +4,17 @@ import { useState, useMemo } from 'react';
 
 export interface Occurrence {
   id: number;
-  justification: string;
-  evidence: string;
+  description: string;
   keywords: string;
-  chatType: string;
   chatId: string;
   chatName: string;
+  clientName: string;
   channel: string;
   status: string;
   category: string;
+  squad: string;
+  gateKepper: boolean;
+  messages: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -20,7 +22,7 @@ export interface FilterState {
   search: string;
   status: string;
   category: string;
-  chatType: string;
+  squad: string;
 }
 
 export function useOccurrenceFilters(occurrences: Occurrence[]) {
@@ -28,7 +30,7 @@ export function useOccurrenceFilters(occurrences: Occurrence[]) {
     search: '',
     status: 'all',
     category: 'all',
-    chatType: 'all'
+    squad: 'all'
   });
 
   const filteredOccurrences = useMemo(() => {
@@ -37,11 +39,11 @@ export function useOccurrenceFilters(occurrences: Occurrence[]) {
       if (filters.search) {
         const searchTerm = filters.search.toLowerCase();
         const matchesSearch = 
-          occurrence.justification.toLowerCase().includes(searchTerm) ||
+          occurrence.description.toLowerCase().includes(searchTerm) ||
           occurrence.chatName.toLowerCase().includes(searchTerm) ||
           occurrence.keywords.toLowerCase().includes(searchTerm) ||
           occurrence.category.toLowerCase().includes(searchTerm) ||
-          occurrence.evidence.toLowerCase().includes(searchTerm);
+          occurrence.clientName.toLowerCase().includes(searchTerm);
         
         if (!matchesSearch) return false;
       }
@@ -56,8 +58,8 @@ export function useOccurrenceFilters(occurrences: Occurrence[]) {
         return false;
       }
 
-      // Chat type filter
-      if (filters.chatType !== 'all' && occurrence.chatType !== filters.chatType) {
+      // Squad filter
+      if (filters.squad !== 'all' && occurrence.squad !== filters.squad) {
         return false;
       }
 
@@ -77,7 +79,7 @@ export function useOccurrenceFilters(occurrences: Occurrence[]) {
       search: '',
       status: 'all',
       category: 'all',
-      chatType: 'all'
+      squad: 'all'
     });
   };
 
@@ -85,7 +87,7 @@ export function useOccurrenceFilters(occurrences: Occurrence[]) {
     return filters.search !== '' || 
            filters.status !== 'all' || 
            filters.category !== 'all' || 
-           filters.chatType !== 'all';
+           filters.squad !== 'all';
   }, [filters]);
 
   return {

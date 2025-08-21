@@ -1,6 +1,6 @@
 'use client';
 
-import { MessageSquare, Mail, Heart, TrendingUp as TrendingUpIcon, TrendingUp, TrendingDown } from 'lucide-react';
+import { BarChart3, Calendar, Heart, TrendingUp as TrendingUpIcon, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 
@@ -26,17 +26,17 @@ function MetricCard({ title, value, variation, icon, type = 'default' }: MetricC
   };
 
   return (
-    <Card className="bg-white border-gray-200">
+    <Card className="bg-white border-gray-200 hover:border-gray-300 transition-colors">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-gray-600">
+        <CardTitle className="text-sm font-medium text-gray-700">
           {title}
         </CardTitle>
-        <div className="text-gray-400">
+        <div className="text-muted-foreground">
           {icon}
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-black">
+        <div className="text-2xl font-bold text-foreground">
           {type === 'percentage' ? `${value}%` : value}
         </div>
         {variation !== undefined && (
@@ -77,16 +77,17 @@ export function MetricCards({ dateRange }: MetricCardsProps) {
 
   const cards = [
     {
-      title: "Ocorrências WhatsApp",
-      value: loading ? "..." : metrics.whatsappTotal,
-      variation: loading ? undefined : metrics.whatsappVariation,
-      icon: <MessageSquare className="h-4 w-4" />,
+      title: "Ocorrências Totais",
+      value: loading ? "..." : metrics.totalOccurrences,
+      variation: loading ? undefined : metrics.totalVariation,
+      icon: <BarChart3 className="h-4 w-4" />,
     },
     {
-      title: "Ocorrências Email",
-      value: loading ? "..." : metrics.emailTotal,
-      variation: loading ? undefined : metrics.emailVariation,
-      icon: <Mail className="h-4 w-4" />,
+      title: "Média de Ocorrências Diárias",
+      value: loading ? "..." : metrics.dailyAverage,
+      variation: loading ? undefined : metrics.averageVariation,
+      icon: <Calendar className="h-4 w-4" />,
+      type: 'default' as const,
     },
     {
       title: "Sentimento Médio",

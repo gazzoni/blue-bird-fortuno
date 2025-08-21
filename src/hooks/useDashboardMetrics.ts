@@ -4,20 +4,20 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export interface DashboardMetrics {
-  whatsappTotal: number;
-  whatsappVariation: number;
-  emailTotal: number;
-  emailVariation: number;
+  totalOccurrences: number;
+  totalVariation: number;
+  dailyAverage: number;
+  averageVariation: number;
   sentimentAvg: number;
   churnRisk: number; // mock percentage until column exists
 }
 
 export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
-    whatsappTotal: 0,
-    whatsappVariation: 0,
-    emailTotal: 0,
-    emailVariation: 0,
+    totalOccurrences: 0,
+    totalVariation: 0,
+    dailyAverage: 0,
+    averageVariation: 0,
     sentimentAvg: 85, // mock placeholder until DB column exists
     churnRisk: 12, // mock placeholder until DB column exists
   });
@@ -39,52 +39,47 @@ export function useDashboardMetrics(dateRange?: { from?: Date; to?: Date }) {
       const fromDateISO = fromDate.toISOString();
       const toDateISO = toDate.toISOString();
 
-      // WhatsApp occurrences: chat_type in ('group','private') filtered by date range
-      const [{ count: whatsappTotal, error: e1 }, { count: whatsapp24h, error: e2 }] = await Promise.all([
+      // Total occurrences in the period
+      const [{ count: totalOccurrences, error: e1 }, { count: total24h, error: e2 }] = await Promise.all([
         supabase
-          .from('occurrences')
+          .from('new-occurrences')
           .select('id', { count: 'exact', head: true })
-          .in('chat_type', ['group', 'private'])
           .gte('created_at', fromDateISO)
           .lte('created_at', toDateISO),
         supabase
-          .from('occurrences')
+          .from('new-occurrences')
           .select('id', { count: 'exact', head: true })
-          .in('chat_type', ['group', 'private'])
           .gte('created_at', since24h),
       ]);
 
       if (e1 || e2) throw e1 || e2;
 
-      // Email occurrences: channel = 'email' filtered by date range
-      const [{ count: emailTotal, error: e3 }, { count: email24h, error: e4 }] = await Promise.all([
-        supabase
-          .from('occurrences')
-          .select('id', { count: 'exact', head: true })
-          .eq('channel', 'email')
-          .gte('created_at', fromDateISO)
-          .lte('created_at', toDateISO),
-        supabase
-          .from('occurrences')
-          .select('id', { count: 'exact', head: true })
-          .eq('channel', 'email')
-          .gte('created_at', since24h),
-      ]);
+      // Calculate daily average
+      const periodDays = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const dailyAverage = totalOccurrences ? Math.round((totalOccurrences / periodDays) * 10) / 10 : 0;
 
-      if (e3 || e4) throw e3 || e4;
-
-      const whatsappVariation = whatsappTotal && whatsappTotal > 0
-        ? Math.round(((whatsapp24h || 0) / whatsappTotal) * 100)
+      // Calculate variations (compared to last 24h)
+      const totalVariation = totalOccurrences && totalOccurrences > 0
+        ? Math.round(((total24h || 0) / totalOccurrences) * 100)
         : 0;
-      const emailVariation = emailTotal && emailTotal > 0
-        ? Math.round(((email24h || 0) / emailTotal) * 100)
+
+      // For daily average variation, compare today's average vs yesterday's
+      const yesterday = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+      const { count: yesterday24h } = await supabase
+        .from('new-occurrences')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', yesterday)
+        .lt('created_at', since24h);
+
+      const averageVariation = yesterday24h && yesterday24h > 0
+        ? Math.round(((total24h || 0) - yesterday24h) / yesterday24h * 100)
         : 0;
 
       setMetrics({
-        whatsappTotal: whatsappTotal || 0,
-        whatsappVariation,
-        emailTotal: emailTotal || 0,
-        emailVariation,
+        totalOccurrences: totalOccurrences || 0,
+        totalVariation,
+        dailyAverage,
+        averageVariation,
         sentimentAvg: 85, // mock placeholder
         churnRisk: 12, // mock placeholder
       });
