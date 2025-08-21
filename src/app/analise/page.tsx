@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Upload, FileText, Download, Loader2, AlertCircle, Eye, Copy } from 'lucide-react'
+import { sendTranscriptToN8n, sendFileToN8n } from '@/lib/n8n'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -243,12 +244,29 @@ Definir roadmap e prioridades para o primeiro trimestre de 2024.
     setIsLoadingModalOpen(true)
     setLoadingStage('uploading')
 
-    // Mock - aqui será a integração com n8n
-    console.log('Enviando para análise:', { 
-      inputMethod, 
-      file: selectedFile, 
-      text: transcriptText 
-    })
+    try {
+      // Enviar para n8n baseado no método de input
+      if (inputMethod === 'text') {
+        await sendTranscriptToN8n({
+          name: analysisName.trim(),
+          type: 'TRANSCRIPT',
+          transcript: transcriptText
+        })
+        console.log('Transcript enviado para n8n com sucesso')
+      } else {
+        await sendFileToN8n({
+          name: analysisName.trim(),
+          type: 'FILE',
+          file: selectedFile!
+        })
+        console.log('Arquivo enviado para n8n com sucesso')
+      }
+    } catch (error) {
+      console.error('Erro ao enviar para n8n:', error)
+      setIsLoadingModalOpen(false)
+      alert('Erro ao enviar dados para processamento. Tente novamente.')
+      return
+    }
 
     // Simular processo com estágios
     setTimeout(() => setLoadingStage('processing'), 2000)
