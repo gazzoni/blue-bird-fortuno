@@ -95,7 +95,7 @@ export function ChartsSection({ dateRange }: ChartsSectionProps) {
   if (error) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
           <Card className="bg-white border-gray-200">
             <CardContent className="p-6">
               <div className="text-center text-muted-foreground">
@@ -111,7 +111,7 @@ export function ChartsSection({ dateRange }: ChartsSectionProps) {
             </CardContent>
           </Card>
         </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card className="bg-white border-gray-200">
           <CardContent className="p-6">
             <div className="text-center text-gray-500">
@@ -300,7 +300,7 @@ export function ChartsSection({ dateRange }: ChartsSectionProps) {
       </div>
 
       {/* Second Row: New charts */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         {/* Squad Line Chart - Padrão shadcn/ui */}
         <Card className="min-h-[500px]">
           <CardHeader>

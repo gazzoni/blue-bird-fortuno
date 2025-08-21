@@ -433,6 +433,7 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
       
       <div className="flex-1 p-6 space-y-6">
         {/* Seção 1: Nova Análise */}
+        <div className="max-w-4xl mx-auto px-4 sm:px-0">
         <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -455,26 +456,32 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
             />
           </div>
 
-          {/* Método de Input */}
+          {/* Método de Input - Tab Switch */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Selecione o método de entrada:</Label>
-            <div className="flex gap-4">
-              <Button
-                variant={inputMethod === 'file' ? 'default' : 'outline'}
-                onClick={() => setInputMethod('file')}
-                className="flex items-center gap-2"
-              >
-                <Upload className="h-4 w-4" />
-                Enviar Arquivo
-              </Button>
-              <Button
-                variant={inputMethod === 'text' ? 'default' : 'outline'}
-                onClick={() => setInputMethod('text')}
-                className="flex items-center gap-2"
-              >
-                <FileText className="h-4 w-4" />
-                Colar Transcript
-              </Button>
+            <div>
+              <div className="bg-muted p-1 rounded-lg inline-flex">
+                <button
+                  onClick={() => setInputMethod('file')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                    inputMethod === 'file'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Enviar Arquivo
+                </button>
+                <button
+                  onClick={() => setInputMethod('text')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                    inputMethod === 'text'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Colar Transcript
+                </button>
+              </div>
             </div>
           </div>
 
@@ -575,8 +582,10 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
           </Button>
         </CardContent>
       </Card>
+      </div>
 
       {/* Seção 2: Histórico de Análises */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-0">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -599,7 +608,7 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 ml-4">
                     <Button
                       variant="outline"
                       size="sm"
@@ -637,6 +646,24 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
           </div>
         </CardContent>
       </Card>
+      </div>
+
+      {/* Card de Informação sobre n8n */}
+      <Card className="border-sky-200 bg-sky-50 max-w-4xl mx-auto px-4 sm:px-0">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-sky-500 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-sky-700">Integração com n8n</p>
+              <p className="text-sky-600 mt-1">
+                Esta funcionalidade está conectada com workflows automatizados que processam os arquivos de áudio/vídeo. 
+                As análises são processadas automaticamente por IA para gerar documentos markdown estruturados.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      </div>
 
       {/* Modal de Loading */}
       <Dialog open={isLoadingModalOpen} onOpenChange={setIsLoadingModalOpen}>
@@ -688,7 +715,7 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
 
       {/* Modal de Preview */}
       <Dialog open={isPreviewModalOpen} onOpenChange={setIsPreviewModalOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-4xl max-w-[95vw] max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center justify-between">
               <span>{currentAnalysis?.title}</span>
@@ -739,22 +766,6 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
         </DialogContent>
       </Dialog>
 
-      {/* Info sobre n8n */}
-      <Card className="border-sky-200 bg-sky-50">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-sky-500 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium text-sky-700">Integração com n8n</p>
-              <p className="text-sky-600 mt-1">
-                Esta página está preparada para integração com workflows do n8n. 
-                As análises são processadas automaticamente por IA para gerar documentos markdown estruturados.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      </div>
     </div>
   )
 }

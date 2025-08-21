@@ -261,7 +261,7 @@ export default function Occurrences() {
               </div>
 
               {/* Filtros com largura fixa */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Status</label>
                   <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as typeof statusFilter); setPage(1); }}>
@@ -330,7 +330,8 @@ export default function Occurrences() {
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Carregando...
               </div>
             ) : (
-            <Table>
+            <div className="overflow-x-auto">
+              <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
@@ -451,7 +452,8 @@ export default function Occurrences() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
             )}
             
             {!loading && occurrences.length === 0 && (

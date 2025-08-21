@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, MessageCircle, AlertTriangle, Bot, FileSearch } from 'lucide-react'
+import { LayoutDashboard, MessageCircle, AlertTriangle, Bot, FileSearch, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeSwitch } from '@/components/ui/theme-switch'
 import Image from 'next/image'
 import { useTheme } from '@/hooks/useTheme'
+import { useState } from 'react'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -19,9 +20,35 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname()
   const { theme } = useTheme()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   return (
-    <div className="flex h-full w-64 flex-col bg-sidebar border-r border-sidebar-border">
+    <>
+      {/* Mobile menu button */}
+      <div className="lg:hidden fixed top-4 left-4 z-50">
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 rounded-md bg-sidebar border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent"
+        >
+          {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </div>
+
+      {/* Mobile overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={cn(
+        "flex h-full w-64 flex-col bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out",
+        "lg:translate-x-0 lg:static lg:inset-0",
+        "fixed inset-y-0 left-0 z-50",
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
       <div className="flex h-16 items-center border-b border-sidebar-border px-6">
         <Image
           src="/bluebird_logo.svg"
@@ -43,6 +70,7 @@ export function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => setIsMobileMenuOpen(false)}
               className={cn(
                 'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 isActive
@@ -70,6 +98,7 @@ export function Sidebar() {
           <ThemeSwitch />
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
