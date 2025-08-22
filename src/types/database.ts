@@ -51,3 +51,13 @@ export interface People {
   push_name: string;
   chat_id: string;
 }
+
+export interface Document {
+  id: number;
+  created_at: string;
+  document_name: string;
+  document_content?: string; // markdown gerado
+  transcript?: string; // transcript original
+  origin_type: 'TRANSCRIPT' | 'MEDIA';
+  origin_status: 'running' | 'completed' | 'error';
+}

@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { Upload, FileText, Download, Loader2, AlertCircle, Eye, Copy } from 'lucide-react'
-import { sendTranscriptToN8n, sendFileToN8n } from '@/lib/n8n'
+import { sendTranscriptToN8n, sendFileToN8n, type N8nResponse } from '@/lib/n8n'
+import { useDocuments } from '@/hooks/useDocuments'
+import type { Document } from '@/types/database'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ReactMarkdown from 'react-markdown'
 
-type AnalysisStatus = 'idle' | 'uploading' | 'processing' | 'completed' | 'error'
+type AnalysisStatus = 'idle' | 'uploading' | 'processing' | 'running' | 'completed' | 'error'
 type InputMethod = 'file' | 'text'
 
 interface AnalysisResult {
@@ -38,14 +40,16 @@ export default function AnalisePage() {
   const [transcriptText, setTranscriptText] = useState('')
   const [analysisName, setAnalysisName] = useState('')
   
-  // Estados para modais
-  const [isLoadingModalOpen, setIsLoadingModalOpen] = useState(false)
+  // Hook para gerenciar documentos reais do banco
+  const { documents, loading: documentsLoading, error: documentsError, fetchDocuments } = useDocuments()
+  
+  // Estados para modais (loading modal removido)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null)
-  const [loadingStage, setLoadingStage] = useState<'uploading' | 'processing' | 'generating'>('uploading')
+  // loadingStage removido - não é mais usado no novo fluxo
   
-  // Histórico de análises
-  const [analysisHistory, setAnalysisHistory] = useState<AnalysisResult[]>([
+  // Histórico de análises (removido - agora usa documents do banco)
+  /* const [analysisHistory, setAnalysisHistory] = useState<AnalysisResult[]>([
     {
       id: '1',
       title: 'Reunião Cliente ABC - Implementação Sistema',
@@ -201,7 +205,7 @@ Definir roadmap e prioridades para o primeiro trimestre de 2024.
 ## Próxima Reunião
 30/01/2024 às 14h para review do progresso.`
     }
-  ])
+  ]) */
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -240,72 +244,48 @@ Definir roadmap e prioridades para o primeiro trimestre de 2024.
     
     if (!hasName || (!hasFile && !hasText)) return
 
-    // Abrir modal de loading
-    setIsLoadingModalOpen(true)
-    setLoadingStage('uploading')
-
     try {
       // Enviar para n8n baseado no método de input
+      let response: N8nResponse
+      
       if (inputMethod === 'text') {
-        await sendTranscriptToN8n({
+        response = await sendTranscriptToN8n({
           name: analysisName.trim(),
           type: 'TRANSCRIPT',
           transcript: transcriptText
         })
-        console.log('Transcript enviado para n8n com sucesso')
       } else {
-        await sendFileToN8n({
+        response = await sendFileToN8n({
           name: analysisName.trim(),
-          type: 'FILE',
+          type: 'MEDIA',
           file: selectedFile!
         })
-        console.log('Arquivo enviado para n8n com sucesso')
       }
+      
+      console.log('Enviado para n8n com sucesso:', response)
+      
+      // Mostrar feedback de sucesso
+      if (response.status === 'running') {
+        alert(`✅ Análise iniciada com sucesso!\nID: ${response.id}\n\nO documento aparecerá na lista abaixo como "Processando" e será atualizado automaticamente quando concluído.`)
+        
+        // Limpar formulário
+        setAnalysisName('')
+        setSelectedFile(null)
+        setTranscriptText('')
+        
+        // Força refresh da lista de documentos para mostrar o novo documento
+        fetchDocuments()
+      } else {
+        alert(`⚠️ Status inesperado: ${response.status}\n${response.message}`)
+      }
+      
     } catch (error) {
       console.error('Erro ao enviar para n8n:', error)
-      setIsLoadingModalOpen(false)
-      alert('Erro ao enviar dados para processamento. Tente novamente.')
-      return
+      alert('❌ Erro ao enviar dados para processamento. Tente novamente.')
     }
-
-    // Simular processo com estágios
-    setTimeout(() => setLoadingStage('processing'), 2000)
-    setTimeout(() => setLoadingStage('generating'), 5000)
-
-    // Simular conclusão e criar nova análise
-    setTimeout(() => {
-      const mockMarkdown = inputMethod === 'file' 
-        ? generateMockMarkdownFromFile(selectedFile!)
-        : generateMockMarkdownFromText(transcriptText)
-
-      const newAnalysis: AnalysisResult = {
-        id: Date.now().toString(),
-        title: analysisName.trim(),
-        fileName: inputMethod === 'file' ? selectedFile!.name : undefined,
-        uploadedAt: new Date().toLocaleString('pt-BR'),
-        processedAt: new Date().toLocaleString('pt-BR'),
-        status: 'completed',
-        duration: '35min',
-        participants: ['Participante 1', 'Participante 2'],
-        summary: 'Análise gerada com sucesso a partir do conteúdo fornecido.',
-        inputMethod,
-        markdownContent: mockMarkdown
-      }
-
-      setAnalysisHistory(prev => [newAnalysis, ...prev])
-      setIsLoadingModalOpen(false)
-      
-      // Abrir preview do resultado
-      setCurrentAnalysis(newAnalysis)
-      setIsPreviewModalOpen(true)
-      
-      // Limpar formulário
-      setSelectedFile(null)
-      setTranscriptText('')
-      setAnalysisName('')
-    }, 8000)
   }
 
+  /* Funções mock removidas - não são mais usadas
   const generateMockMarkdownFromFile = (file: File): string => {
     return `# Análise de Reunião - ${file.name}
 
@@ -402,12 +382,9 @@ ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}
 Resumo final dos pontos mais importantes e direcionamentos sugeridos.
 
 *Análise gerada automaticamente por IA em ${new Date().toLocaleString('pt-BR')}*`
-  }
+  } */
 
-  const handlePreview = (analysis: AnalysisResult) => {
-    setCurrentAnalysis(analysis)
-    setIsPreviewModalOpen(true)
-  }
+  // handlePreview removido - agora usa handlePreviewDocument
 
   const handleDownload = (analysis: AnalysisResult) => {
     if (!analysis.markdownContent) return
@@ -423,6 +400,43 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
     URL.revokeObjectURL(url)
   }
 
+  // Funções para documentos reais do banco
+  const handlePreviewDocument = (doc: Document) => {
+    if (!doc.document_content) return
+    
+    // Converter Document para AnalysisResult para compatibilidade com o modal
+    const analysisResult: AnalysisResult = {
+      id: doc.id.toString(),
+      title: doc.document_name,
+      fileName: doc.origin_type === 'MEDIA' ? doc.document_name : undefined,
+      uploadedAt: new Date(doc.created_at).toLocaleString('pt-BR'),
+      processedAt: undefined, // Não temos esse campo no novo schema
+      status: doc.origin_status,
+      duration: undefined, // Não temos mais metadata
+      participants: undefined, // Não temos mais metadata
+      summary: undefined, // Não temos mais metadata
+      inputMethod: doc.origin_type === 'MEDIA' ? 'file' : 'text',
+      markdownContent: doc.document_content
+    }
+    
+    setCurrentAnalysis(analysisResult)
+    setIsPreviewModalOpen(true)
+  }
+
+  const handleDownloadDocument = (doc: Document) => {
+    if (!doc.document_content) return
+    
+    const blob = new Blob([doc.document_content], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${doc.document_name.replace(/[^a-zA-Z0-9]/g, '_')}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -432,18 +446,7 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
     }
   }
 
-  const getLoadingMessage = () => {
-    switch (loadingStage) {
-      case 'uploading':
-        return 'Enviando arquivo...'
-      case 'processing':
-        return 'Processando conteúdo...'
-      case 'generating':
-        return 'Gerando análise em markdown...'
-      default:
-        return 'Processando...'
-    }
-  }
+  // getLoadingMessage removido - modal de loading não é mais usado
 
   return (
     <div className="flex flex-col h-full">
@@ -612,124 +615,87 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {analysisHistory.map((analysis) => (
-              <div key={analysis.id} className="border rounded-lg p-4 space-y-3 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-medium text-gray-900">{analysis.title}</h3>
-                    <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                      <span>📅 {analysis.uploadedAt}</span>
-                      {analysis.duration && <span>⏱️ {analysis.duration}</span>}
-                      <Badge variant="outline" className="text-xs">
-                        {analysis.inputMethod === 'file' ? '📁 Arquivo' : '📝 Texto'}
-                      </Badge>
+          {documentsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
+              <span className="ml-2 text-gray-600">Carregando documentos...</span>
+            </div>
+          ) : documentsError ? (
+            <div className="flex items-center justify-center py-8">
+              <AlertCircle className="h-6 w-6 text-red-500" />
+              <span className="ml-2 text-red-600">Erro ao carregar documentos: {documentsError}</span>
+            </div>
+          ) : documents.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Nenhuma análise encontrada</p>
+              <p className="text-sm">Crie sua primeira análise acima!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {documents.map((document) => (
+                <div key={document.id} className="border rounded-lg p-4 space-y-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium">{document.document_name}</h3>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                        <span>📅 {new Date(document.created_at).toLocaleDateString('pt-BR')}</span>
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs"
+                        >
+                          {document.origin_type === 'MEDIA' ? '📁 Arquivo' : '📝 Transcript'}
+                        </Badge>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            document.origin_status === 'completed' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-700' :
+                            document.origin_status === 'running' ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-700' :
+                            'bg-red-50 text-red-700 border-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-700'
+                          }`}
+                        >
+                          {document.origin_status === 'completed' ? '✅ Concluído' :
+                           document.origin_status === 'running' ? '⏳ Processando' :
+                           '❌ Erro'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 ml-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePreviewDocument(document)}
+                        className="flex items-center gap-1"
+                        disabled={document.origin_status !== 'completed' || !document.document_content}
+                      >
+                        <Eye className="h-4 w-4" />
+                        Preview
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadDocument(document)}
+                        className="flex items-center gap-1"
+                        disabled={document.origin_status !== 'completed' || !document.document_content}
+                      >
+                        <Download className="h-4 w-4" />
+                        Download
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePreview(analysis)}
-                      className="flex items-center gap-1"
-                    >
-                      <Eye className="h-4 w-4" />
-                      Preview
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownload(analysis)}
-                      className="flex items-center gap-1"
-                    >
-                      <Download className="h-4 w-4" />
-                      Download
-                    </Button>
-                  </div>
+
+                  {/* Metadata removido - agora usando campos diretos da tabela */}
                 </div>
-
-                {analysis.participants && (
-                  <div className="text-sm text-gray-600">
-                    <strong>Participantes:</strong> {analysis.participants.join(', ')}
-                  </div>
-                )}
-
-                {analysis.summary && (
-                  <div className="bg-gray-100 p-3 rounded text-sm text-gray-700">
-                    {analysis.summary}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
       </div>
 
-      {/* Card de Informação sobre n8n */}
-      <Card className="border-sky-200 bg-sky-50 max-w-4xl mx-auto px-4 sm:px-0">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-sky-500 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium text-sky-700">Integração com n8n</p>
-              <p className="text-sky-600 mt-1">
-                Esta funcionalidade está conectada com workflows automatizados que processam os arquivos de áudio/vídeo. 
-                As análises são processadas automaticamente por IA para gerar documentos markdown estruturados.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      </div>
+      {/* Card de informação removido */}
 
-      {/* Modal de Loading */}
-      <Dialog open={isLoadingModalOpen} onOpenChange={setIsLoadingModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Processando Análise
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="text-center">
-              <div className="mb-4">
-                <Loader2 className="h-16 w-16 animate-spin mx-auto text-sky-500" />
-              </div>
-              <p className="text-lg font-medium">{getLoadingMessage()}</p>
-              <p className="text-sm text-gray-500 mt-2">
-                Este processo pode levar alguns minutos...
-              </p>
-            </div>
-            
-            {/* Indicador de Progresso */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className={loadingStage === 'uploading' ? 'text-sky-600 font-medium' : 'text-gray-400'}>
-                  ✓ Enviando
-                </span>
-                <span className={loadingStage === 'processing' ? 'text-sky-600 font-medium' : 'text-gray-400'}>
-                  {loadingStage === 'processing' || loadingStage === 'generating' ? '⏳' : '○'} Processando
-                </span>
-                <span className={loadingStage === 'generating' ? 'text-sky-600 font-medium' : 'text-gray-400'}>
-                  {loadingStage === 'generating' ? '⏳' : '○'} Gerando
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-sky-500 h-2 rounded-full transition-all duration-500"
-                  style={{
-                    width: loadingStage === 'uploading' ? '33%' : 
-                           loadingStage === 'processing' ? '66%' : 
-                           loadingStage === 'generating' ? '100%' : '0%'
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Modal de Loading removido - agora usa feedback direto */}
 
       {/* Modal de Preview */}
       <Dialog open={isPreviewModalOpen} onOpenChange={setIsPreviewModalOpen}>
@@ -784,6 +750,7 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
         </DialogContent>
       </Dialog>
 
+      </div>
     </div>
   )
 }

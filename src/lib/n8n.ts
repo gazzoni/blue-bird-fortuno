@@ -14,8 +14,14 @@ export interface N8nTranscriptPayload {
 export interface N8nFilePayload {
   timestamp: string
   name: string
-  type: 'FILE'
+  type: 'MEDIA'
   file: File
+}
+
+export interface N8nResponse {
+  id: number
+  status: 'running' | 'completed' | 'error'
+  message: string
 }
 
 /**
@@ -41,7 +47,7 @@ export function getSaoPauloTimestamp(): string {
 /**
  * Envia transcript para o webhook do n8n
  */
-export async function sendTranscriptToN8n(payload: Omit<N8nTranscriptPayload, 'timestamp'>): Promise<void> {
+export async function sendTranscriptToN8n(payload: Omit<N8nTranscriptPayload, 'timestamp'>): Promise<N8nResponse> {
   const data: N8nTranscriptPayload = {
     ...payload,
     timestamp: getSaoPauloTimestamp()
@@ -58,12 +64,14 @@ export async function sendTranscriptToN8n(payload: Omit<N8nTranscriptPayload, 't
   if (!response.ok) {
     throw new Error(`Erro ao enviar para n8n: ${response.status} ${response.statusText}`)
   }
+
+  return await response.json() as N8nResponse
 }
 
 /**
  * Envia arquivo para o webhook do n8n
  */
-export async function sendFileToN8n(payload: Omit<N8nFilePayload, 'timestamp'>): Promise<void> {
+export async function sendFileToN8n(payload: Omit<N8nFilePayload, 'timestamp'>): Promise<N8nResponse> {
   const formData = new FormData()
   
   formData.append('timestamp', getSaoPauloTimestamp())
@@ -79,4 +87,6 @@ export async function sendFileToN8n(payload: Omit<N8nFilePayload, 'timestamp'>):
   if (!response.ok) {
     throw new Error(`Erro ao enviar arquivo para n8n: ${response.status} ${response.statusText}`)
   }
+
+  return await response.json() as N8nResponse
 }
