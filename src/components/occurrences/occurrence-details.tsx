@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { WhatsAppChat } from "@/components/ui/whatsapp-chat"
+import { InlineStatusEditor } from "@/components/occurrences/inline-status-editor"
+import { ModalDescriptionEditor } from "@/components/occurrences/modal-description-editor"
 import { Clock, CheckCircle, User, MessageSquare, Hash, Calendar, Building, Users, Heart } from "lucide-react"
 import type { Occurrence } from "@/hooks/useOccurrenceFilters"
 
@@ -17,6 +19,9 @@ interface Message {
 interface OccurrenceDetailsProps {
   occurrence: Occurrence
   onFeedbackClick?: () => void
+  onStatusUpdate?: (occurrenceId: number, newStatus: string) => Promise<void>
+  onDescriptionUpdate?: (occurrenceId: number, newDescription: string) => Promise<void>
+  onResolutionUpdate?: (occurrenceId: number, newResolution: string) => Promise<void>
 }
 
 function formatDateTime(dateString: string) {
@@ -51,7 +56,7 @@ function getStatusBadge(status: string) {
   }
 }
 
-export function OccurrenceDetails({ occurrence, onFeedbackClick }: OccurrenceDetailsProps) {
+export function OccurrenceDetails({ occurrence, onFeedbackClick, onStatusUpdate, onDescriptionUpdate, onResolutionUpdate }: OccurrenceDetailsProps) {
   // Parse messages from jsonb
   const messages: Message[] = Array.isArray(occurrence.messages) 
     ? occurrence.messages as Message[]
@@ -60,12 +65,25 @@ export function OccurrenceDetails({ occurrence, onFeedbackClick }: OccurrenceDet
     : []
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Ocorrência #{occurrence.id}</h2>
-          {getStatusBadge(occurrence.status)}
+          <div>
+            <h2 className="text-lg font-semibold">Ocorrência #{occurrence.id}</h2>
+            {occurrence.occurrenceName && (
+              <p className="text-sm text-gray-600 mt-1">{occurrence.occurrenceName}</p>
+            )}
+          </div>
+          {onStatusUpdate ? (
+            <InlineStatusEditor
+              currentStatus={occurrence.status}
+              occurrenceId={occurrence.id}
+              onStatusUpdate={onStatusUpdate}
+            />
+          ) : (
+            getStatusBadge(occurrence.status)
+          )}
         </div>
         
         <div className="flex items-center text-sm text-gray-500">
@@ -76,48 +94,53 @@ export function OccurrenceDetails({ occurrence, onFeedbackClick }: OccurrenceDet
 
       {/* Basic Info */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center">
-            <User className="w-5 h-5 mr-2" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center">
+            <User className="w-4 h-4 mr-2" />
             Informações Básicas
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4">
+        <CardContent className="pt-0 space-y-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-gray-500">Chat</label>
-              <p className="text-sm font-medium">{occurrence.chatName}</p>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Chat</label>
+              <p className="text-sm font-medium mt-1">{occurrence.chatName}</p>
             </div>
             
             <div>
-              <label className="text-sm font-medium text-gray-500">Cliente</label>
-              <p className="text-sm font-medium">{occurrence.clientName}</p>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cliente</label>
+              <p className="text-sm font-medium mt-1">{occurrence.clientName}</p>
             </div>
             
             <div>
-              <label className="text-sm font-medium text-gray-500">Canal</label>
-              <p className="text-sm">{occurrence.channel}</p>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Canal</label>
+              <p className="text-sm mt-1">{occurrence.channel}</p>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-500">Squad</label>
-                <div className="mt-1">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    <Users className="w-3 h-3 mr-1" />
-                    {occurrence.squad}
-                  </Badge>
-                </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Gate Keeper</label>
+              <p className="text-sm mt-1">{occurrence.gateKepper ? 'Sim' : 'Não'}</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Squad</label>
+              <div className="mt-1">
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  <Users className="w-3 h-3 mr-1" />
+                  {occurrence.squad}
+                </Badge>
               </div>
-              
-              <div>
-                <label className="text-sm font-medium text-gray-500">Categoria</label>
-                <div className="mt-1">
-                  <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                    <Building className="w-3 h-3 mr-1" />
-                    {occurrence.category}
-                  </Badge>
-                </div>
+            </div>
+            
+            <div>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Categoria</label>
+              <div className="mt-1">
+                <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                  <Building className="w-3 h-3 mr-1" />
+                  {occurrence.category}
+                </Badge>
               </div>
             </div>
           </div>
@@ -126,26 +149,35 @@ export function OccurrenceDetails({ occurrence, onFeedbackClick }: OccurrenceDet
 
       {/* Description */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center">
-            <MessageSquare className="w-5 h-5 mr-2" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center">
+            <MessageSquare className="w-4 h-4 mr-2" />
             Descrição
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm leading-relaxed">{occurrence.description}</p>
+        <CardContent className="pt-0">
+          {onDescriptionUpdate ? (
+            <ModalDescriptionEditor
+              currentDescription={occurrence.description}
+              occurrenceId={occurrence.id}
+              onDescriptionUpdate={onDescriptionUpdate}
+              maxLength={1000}
+            />
+          ) : (
+            <p className="text-sm leading-relaxed">{occurrence.description}</p>
+          )}
         </CardContent>
       </Card>
 
       {/* Keywords */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center">
-            <Hash className="w-5 h-5 mr-2" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center">
+            <Hash className="w-4 h-4 mr-2" />
             Palavras-chave
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="flex flex-wrap gap-2">
             {occurrence.keywords.split(', ').map((keyword, index) => (
               <Badge key={index} variant="secondary" className="text-xs">
@@ -156,36 +188,63 @@ export function OccurrenceDetails({ occurrence, onFeedbackClick }: OccurrenceDet
         </CardContent>
       </Card>
 
+      {/* Resolution */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center">
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Resolução
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {onResolutionUpdate ? (
+            <ModalDescriptionEditor
+              currentDescription={occurrence.occurrenceResolution || ''}
+              occurrenceId={occurrence.id}
+              onDescriptionUpdate={onResolutionUpdate}
+              maxLength={500}
+              placeholder="Digite a resolução da ocorrência..."
+            />
+          ) : (
+            <p className="text-sm leading-relaxed text-gray-500">
+              {occurrence.occurrenceResolution || 'Nenhuma resolução registrada ainda.'}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* WhatsApp Messages */}
       {messages.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <MessageSquare className="w-5 h-5 mr-2 text-green-600" />
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center">
+              <MessageSquare className="w-4 h-4 mr-2 text-green-600" />
               Mensagens do WhatsApp
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0 min-h-[390px]">
             <WhatsAppChat messages={messages} />
           </CardContent>
         </Card>
       )}
 
       {/* Feedback Button */}
-      <div className="mt-8 pt-6 border-t border-gray-200">
-        <div className="flex justify-center">
-          <Button
-            onClick={onFeedbackClick}
-            className="bg-sky-500 hover:bg-sky-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
-          >
-            <Heart className="w-4 h-4" />
-            Avaliar esta Ocorrência
-          </Button>
+      {onFeedbackClick && (
+        <div className="pt-4 border-t border-gray-200">
+          <div className="flex justify-center">
+            <Button
+              onClick={onFeedbackClick}
+              className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            >
+              <Heart className="w-4 h-4" />
+              Avaliar esta Ocorrência
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500 text-center mt-2">
+            Seu feedback nos ajuda a melhorar o sistema
+          </p>
         </div>
-        <p className="text-xs text-gray-500 text-center mt-2">
-          Seu feedback nos ajuda a melhorar o sistema
-        </p>
-      </div>
+      )}
     </div>
   )
 }

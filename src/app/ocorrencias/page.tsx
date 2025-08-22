@@ -9,16 +9,19 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Search, Filter, Eye, AlertTriangle, Clock, CheckCircle, X, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FeedbackModal } from '@/components/feedback/feedback-modal'
 import { OccurrenceDetails } from '@/components/occurrences/occurrence-details'
+import { InlineStatusEditor } from '@/components/occurrences/inline-status-editor'
+import { InlineDescriptionEditor } from '@/components/occurrences/inline-description-editor'
+import { useTableResize } from '@/hooks/useTableResize'
 import type { Occurrence as OccurrenceFiltersType } from '@/hooks/useOccurrenceFilters'
-import { supabase } from '@/lib/supabase'
+import { supabase, updateOccurrenceStatus, updateOccurrenceDescription, updateOccurrenceResolution } from '@/lib/supabase'
 
 // Estado que receberá os dados reais do Supabase
 type Occurrence = OccurrenceFiltersType
 
-type SortField = 'created_at' | 'status' | 'client_name' | 'squad' | 'category'
+type SortField = 'created_at' | 'status' | 'client_name' | 'squad' | 'category' | 'occurrence_name'
 type SortDirection = 'asc' | 'desc'
 
 const useSupabaseOccurrences = (
@@ -50,7 +53,7 @@ const useSupabaseOccurrences = (
         let query = supabase
           .from('new-occurrences')
           .select(
-            'id, created_at, description, key_words, chat_id, chat_name, client_name, channel, status, category, squad, gate_kepper, messages',
+            'id, created_at, occurrence_name, description, occurrence_resolution, key_words, chat_id, chat_name, client_name, channel, status, category, squad, gate_kepper, messages',
             { count: 'exact' }
           )
           .order(params.sortField, { ascending: params.sortDirection === 'asc' })
@@ -61,7 +64,7 @@ const useSupabaseOccurrences = (
         if (params.squad !== 'all') query = query.eq('squad', params.squad)
         if (params.search.trim().length > 0) {
           const searchTerm = params.search.trim()
-          query = query.or(`description.ilike.%${searchTerm}%,chat_name.ilike.%${searchTerm}%,client_name.ilike.%${searchTerm}%,key_words.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%`)
+          query = query.or(`occurrence_name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,chat_name.ilike.%${searchTerm}%,client_name.ilike.%${searchTerm}%,key_words.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%`)
         }
 
         const { data, error, count } = await query
@@ -75,7 +78,9 @@ const useSupabaseOccurrences = (
         const mapped: Occurrence[] = (data || []).map((row: {
           id: number;
           created_at: string;
+          occurrence_name: string | null;
           description: string | null;
+          occurrence_resolution: string | null;
           key_words: string | null;
           chat_id: string | null;
           chat_name: string | null;
@@ -89,7 +94,9 @@ const useSupabaseOccurrences = (
         }) => ({
           id: row.id,
           createdAt: row.created_at,
+          occurrenceName: row.occurrence_name ?? '',
           description: row.description ?? '',
+          occurrenceResolution: row.occurrence_resolution ?? '',
           keywords: row.key_words ?? '',
           chatId: row.chat_id ?? '',
           chatName: row.chat_name ?? '',
@@ -125,22 +132,7 @@ const useSupabaseOccurrences = (
   return { occurrences, loading, error, totalCount }
 }
 
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'aberto':
-      return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-        <Clock className="w-3 h-3 mr-1" />
-        Aberto
-      </Badge>
-    case 'resolvido':
-      return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-        <CheckCircle className="w-3 h-3 mr-1" />
-        Resolvido
-      </Badge>
-    default:
-      return <Badge variant="outline">{status}</Badge>
-  }
-}
+
 
 const getCategoryBadge = (category: string) => {
   const label = (category || '').replaceAll('_', ' ') || '—'
@@ -158,9 +150,11 @@ export default function Occurrences() {
   const [selectedOccurrence, setSelectedOccurrence] = useState<Occurrence | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
+  const [localOccurrences, setLocalOccurrences] = useState<Occurrence[]>([])
+  const { columnWidths, handleMouseDown, isResizing } = useTableResize()
   const pageSize = 50
 
-  const { occurrences, loading, error, totalCount } = useSupabaseOccurrences({
+  const { occurrences: fetchedOccurrences, loading, error, totalCount } = useSupabaseOccurrences({
     search,
     status: statusFilter,
     category: categoryFilter,
@@ -171,6 +165,12 @@ export default function Occurrences() {
     sortDirection,
   })
 
+  // Sincronizar dados locais com os fetchados
+  useEffect(() => {
+    setLocalOccurrences(fetchedOccurrences)
+  }, [fetchedOccurrences])
+
+  const occurrences = localOccurrences
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   const hasActiveFilters = search !== '' || statusFilter !== 'all' || categoryFilter !== 'all' || squadFilter !== 'all'
 
@@ -200,6 +200,71 @@ export default function Occurrences() {
 
   const handleOpenFeedback = () => {
     setIsFeedbackOpen(true)
+  }
+
+
+
+  const handleStatusUpdate = async (occurrenceId: number, newStatus: string) => {
+    try {
+      await updateOccurrenceStatus(occurrenceId, newStatus)
+      
+      // Atualizar a lista local para refletir a mudança imediatamente
+      setLocalOccurrences(prev => 
+        prev.map(occ => 
+          occ.id === occurrenceId 
+            ? { ...occ, status: newStatus }
+            : occ
+        )
+      )
+      
+      // Mostrar mensagem de sucesso (opcional - pode ser removida para UX mais limpa)
+      // alert('✅ Status atualizado com sucesso!')
+      
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error)
+      alert('❌ Erro ao atualizar status. Tente novamente.')
+      throw error // Re-throw para que o modal saiba que houve erro
+    }
+  }
+
+  const handleDescriptionUpdate = async (occurrenceId: number, newDescription: string) => {
+    try {
+      await updateOccurrenceDescription(occurrenceId, newDescription)
+      
+      // Atualizar a lista local para refletir a mudança imediatamente
+      setLocalOccurrences(prev => 
+        prev.map(occ => 
+          occ.id === occurrenceId 
+            ? { ...occ, description: newDescription }
+            : occ
+        )
+      )
+      
+    } catch (error) {
+      console.error('Erro ao atualizar descrição:', error)
+      alert('❌ Erro ao atualizar descrição. Tente novamente.')
+      throw error // Re-throw para que o componente saiba que houve erro
+    }
+  }
+
+  const handleResolutionUpdate = async (occurrenceId: number, newResolution: string) => {
+    try {
+      await updateOccurrenceResolution(occurrenceId, newResolution)
+      
+      // Atualizar a lista local para refletir a mudança imediatamente
+      setLocalOccurrences(prev => 
+        prev.map(occ => 
+          occ.id === occurrenceId 
+            ? { ...occ, occurrenceResolution: newResolution }
+            : occ
+        )
+      )
+      
+    } catch (error) {
+      console.error('Erro ao atualizar resolução:', error)
+      alert('❌ Erro ao atualizar resolução. Tente novamente.')
+      throw error // Re-throw para que o componente saiba que houve erro
+    }
   }
 
   const handleFeedbackSubmit = async (feedback: { type: 'like' | 'dislike'; comment: string; occurrenceId: number }) => {
@@ -348,112 +413,253 @@ export default function Occurrences() {
               </div>
             ) : (
             <div className="overflow-x-auto">
-              <Table className="min-w-full">
+              <Table className="min-w-full"
+                style={{
+                  tableLayout: 'fixed',
+                  width: Object.values(columnWidths).reduce((sum, width) => sum + width, 0) + 'px'
+                }}
+              >
               <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>
+                <TableRow className="divide-x divide-gray-200">
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.id }}
+                  >
+                    <span className="truncate">ID</span>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'id')}
+                    />
+                  </TableHead>
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.created_at }}
+                  >
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="h-auto p-0 font-medium hover:bg-transparent"
+                      className="h-auto p-0 font-medium hover:bg-transparent truncate"
                       onClick={() => handleSort('created_at')}
                     >
                       Data/Hora
                       {getSortIcon('created_at')}
                     </Button>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'created_at')}
+                    />
                   </TableHead>
-                  <TableHead>
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.occurrence_name }}
+                  >
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="h-auto p-0 font-medium hover:bg-transparent"
+                      className="h-auto p-0 font-medium hover:bg-transparent truncate"
+                      onClick={() => handleSort('occurrence_name')}
+                    >
+                      Nome
+                      {getSortIcon('occurrence_name')}
+                    </Button>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'occurrence_name')}
+                    />
+                  </TableHead>
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.description }}
+                  >
+                    <span className="truncate">Descrição</span>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'description')}
+                    />
+                  </TableHead>
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.client_name }}
+                  >
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-auto p-0 font-medium hover:bg-transparent truncate"
                       onClick={() => handleSort('client_name')}
                     >
-                      Chat/Cliente
+                      Cliente
                       {getSortIcon('client_name')}
                     </Button>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'client_name')}
+                    />
                   </TableHead>
-                  <TableHead>
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.status }}
+                  >
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="h-auto p-0 font-medium hover:bg-transparent"
-                      onClick={() => handleSort('squad')}
-                    >
-                      Squad
-                      {getSortIcon('squad')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-auto p-0 font-medium hover:bg-transparent"
-                      onClick={() => handleSort('category')}
-                    >
-                      Categoria
-                      {getSortIcon('category')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-auto p-0 font-medium hover:bg-transparent"
+                      className="h-auto p-0 font-medium hover:bg-transparent truncate"
                       onClick={() => handleSort('status')}
                     >
                       Status
                       {getSortIcon('status')}
                     </Button>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'status')}
+                    />
                   </TableHead>
-                  <TableHead>Palavras-chave</TableHead>
-                  <TableHead>Ações</TableHead>
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.category }}
+                  >
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-auto p-0 font-medium hover:bg-transparent truncate"
+                      onClick={() => handleSort('category')}
+                    >
+                      Categoria
+                      {getSortIcon('category')}
+                    </Button>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'category')}
+                    />
+                  </TableHead>
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.squad }}
+                  >
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-auto p-0 font-medium hover:bg-transparent truncate"
+                      onClick={() => handleSort('squad')}
+                    >
+                      Squad
+                      {getSortIcon('squad')}
+                    </Button>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'squad')}
+                    />
+                  </TableHead>
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.chat_name }}
+                  >
+                    <span className="truncate">Chat</span>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'chat_name')}
+                    />
+                  </TableHead>
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.resolution }}
+                  >
+                    <span className="truncate">Resolução</span>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'resolution')}
+                    />
+                  </TableHead>
+                  <TableHead 
+                    className="relative group border-r border-gray-200"
+                    style={{ width: columnWidths.keywords }}
+                  >
+                    <span className="truncate">Palavras-chave</span>
+                    <div 
+                      className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleMouseDown(e, 'keywords')}
+                    />
+                  </TableHead>
+                  <TableHead style={{ width: columnWidths.actions }}>
+                    <span className="truncate">Ações</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                     {occurrences.map((occurrence) => (
                   <TableRow key={occurrence.id}>
-                    <TableCell className="font-medium">#{occurrence.id}</TableCell>
-                    <TableCell>
-                      {new Date(occurrence.createdAt).toLocaleString('pt-BR')}
+                    <TableCell className="font-medium">
+                      <div className="truncate">#{occurrence.id}</div>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{occurrence.chatName}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {occurrence.clientName}
+                      <div className="truncate">{new Date(occurrence.createdAt).toLocaleString('pt-BR')}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="relative group">
+                        <div className="font-medium truncate pr-8">{occurrence.occurrenceName}</div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleOpenDetails(occurrence)}
+                          className="absolute right-0 top-0 h-full w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 hover:bg-blue-50"
+                        >
+                          <Eye className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="truncate">
+                        <InlineDescriptionEditor
+                          currentDescription={occurrence.description}
+                          occurrenceId={occurrence.id}
+                          onDescriptionUpdate={handleDescriptionUpdate}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium truncate">{occurrence.clientName}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="truncate">
+                        <InlineStatusEditor
+                          currentStatus={occurrence.status}
+                          occurrenceId={occurrence.id}
+                          onStatusUpdate={handleStatusUpdate}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="truncate">
+                        {getCategoryBadge(occurrence.category)}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="truncate">
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          {occurrence.squad || '—'}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium truncate">{occurrence.chatName}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="truncate" title={occurrence.occurrenceResolution}>
+                        {occurrence.occurrenceResolution || '—'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="truncate">
+                        <div className="flex flex-wrap gap-1">
+                          {occurrence.keywords.split(', ').map((keyword, index) => (
+                            <Badge 
+                              key={index} 
+                              variant="secondary" 
+                              className="text-xs"
+                            >
+                              {keyword}
+                            </Badge>
+                          ))}
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                        {occurrence.squad || '—'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {getCategoryBadge(occurrence.category)}
-                    </TableCell>
-                    <TableCell className="max-w-xs">
-                      <div className="truncate" title={occurrence.description}>
-                        {occurrence.description}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(occurrence.status)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {occurrence.keywords.split(', ').map((keyword, index) => (
-                          <Badge 
-                            key={index} 
-                            variant="secondary" 
-                            className="text-xs"
-                          >
-                            {keyword}
-                          </Badge>
-                        ))}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -511,22 +717,25 @@ export default function Occurrences() {
       </div>
 
       {/* Details Modal */}
-      <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <SheetContent className="w-[900px] sm:max-w-[900px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Detalhes da Ocorrência</SheetTitle>
-          </SheetHeader>
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Ocorrência</DialogTitle>
+          </DialogHeader>
           
           <div className="mt-6 pb-6">
             {selectedOccurrence && (
               <OccurrenceDetails 
                 occurrence={selectedOccurrence} 
                 onFeedbackClick={handleOpenFeedback}
+                onStatusUpdate={handleStatusUpdate}
+                onDescriptionUpdate={handleDescriptionUpdate}
+                onResolutionUpdate={handleResolutionUpdate}
               />
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* Feedback Modal */}
       {selectedOccurrence && (
@@ -537,6 +746,7 @@ export default function Occurrences() {
           onSubmit={handleFeedbackSubmit}
         />
       )}
+
     </div>
   )
 }

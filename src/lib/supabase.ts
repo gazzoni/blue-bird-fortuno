@@ -56,3 +56,39 @@ export const getPeople = async (): Promise<People[]> => {
   if (error) throw error
   return data || []
 }
+
+export const updateOccurrenceStatus = async (id: number, status: string): Promise<void> => {
+  const { error } = await supabase
+    .from('new-occurrences')
+    .update({ status })
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
+export const updateOccurrenceDescription = async (id: number, description: string): Promise<void> => {
+  const { error } = await supabase
+    .from('new-occurrences')
+    .update({ description })
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
+export const updateOccurrenceName = async (id: number, occurrence_name: string): Promise<void> => {
+  const { error } = await supabase
+    .from('new-occurrences')
+    .update({ occurrence_name })
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
+export const updateOccurrenceResolution = async (id: number, occurrence_resolution: string): Promise<void> => {
+  const { error } = await supabase
+    .from('new-occurrences')
+    .update({ occurrence_resolution })
+    .eq('id', id)
+  
+  if (error) throw error
+}

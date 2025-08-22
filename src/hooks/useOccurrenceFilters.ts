@@ -4,7 +4,9 @@ import { useState, useMemo } from 'react';
 
 export interface Occurrence {
   id: number;
+  occurrenceName: string;
   description: string;
+  occurrenceResolution: string;
   keywords: string;
   chatId: string;
   chatName: string;
@@ -39,6 +41,7 @@ export function useOccurrenceFilters(occurrences: Occurrence[]) {
       if (filters.search) {
         const searchTerm = filters.search.toLowerCase();
         const matchesSearch = 
+          occurrence.occurrenceName.toLowerCase().includes(searchTerm) ||
           occurrence.description.toLowerCase().includes(searchTerm) ||
           occurrence.chatName.toLowerCase().includes(searchTerm) ||
           occurrence.keywords.toLowerCase().includes(searchTerm) ||

@@ -13,8 +13,10 @@ export interface Occurrence {
   chat_id: string;
   chat_name: string;
   client_name: string;
+  occurrence_name: string;
   status: string;
   description: string;
+  occurrence_resolution: string;
   key_words: string;
   messages: Record<string, unknown>; // jsonb
   channel: string;

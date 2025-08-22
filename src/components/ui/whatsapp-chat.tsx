@@ -42,7 +42,7 @@ export function WhatsAppChat({ messages, className }: WhatsAppChatProps) {
   }
 
   return (
-    <div className={cn("flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg max-h-80 overflow-y-auto", className)}>
+    <div className={cn("flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg max-h-[416px] overflow-y-auto", className)}>
       {messages.map((message, index) => (
         <div key={index} className="flex items-start space-x-3">
           <Avatar className="w-8 h-8 flex-shrink-0">
