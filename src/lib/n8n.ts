@@ -3,6 +3,7 @@
  */
 
 const N8N_WEBHOOK_URL = 'https://n8n.rudimentar.com/webhook/cc8d6bdc-5888-4bd2-be50-61e86538a935'
+const N8N_FEEDBACK_WEBHOOK_URL = 'https://n8n.rudimentar.com/webhook/57377a45-2ac9-4dfd-8f74-3cb38563c8b7'
 
 export interface N8nTranscriptPayload {
   timestamp: string
@@ -21,6 +22,17 @@ export interface N8nFilePayload {
 export interface N8nResponse {
   id: number
   status: 'running' | 'completed' | 'error'
+  message: string
+}
+
+export interface N8nFeedbackPayload {
+  occurrence_id: number
+  feedback_type: 'positive' | 'negative'
+  feedback_content: string
+}
+
+export interface N8nFeedbackResponse {
+  success: boolean
   message: string
 }
 
@@ -89,4 +101,23 @@ export async function sendFileToN8n(payload: Omit<N8nFilePayload, 'timestamp'>):
   }
 
   return await response.json() as N8nResponse
+}
+
+/**
+ * Envia feedback de ocorrência para o n8n
+ */
+export async function sendFeedbackToN8n(payload: N8nFeedbackPayload): Promise<N8nFeedbackResponse> {
+  const response = await fetch(N8N_FEEDBACK_WEBHOOK_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload)
+  })
+
+  if (!response.ok) {
+    throw new Error(`Erro ao enviar feedback para n8n: ${response.status} ${response.statusText}`)
+  }
+
+  return await response.json() as N8nFeedbackResponse
 }

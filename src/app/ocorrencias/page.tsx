@@ -203,9 +203,26 @@ export default function Occurrences() {
   }
 
   const handleFeedbackSubmit = async (feedback: { type: 'like' | 'dislike'; comment: string; occurrenceId: number }) => {
-    console.log('Feedback enviado:', feedback)
-    // TODO: Integrar com banco de dados
-    // Aqui você pode implementar a integração com o Supabase posteriormente
+    try {
+      // Importar a função de envio de feedback
+      const { sendFeedbackToN8n } = await import('@/lib/n8n')
+      
+      // Enviar feedback para o webhook n8n
+      const response = await sendFeedbackToN8n({
+        occurrence_id: feedback.occurrenceId,
+        feedback_type: feedback.type === 'like' ? 'positive' : 'negative',
+        feedback_content: feedback.comment
+      })
+      
+      console.log('Feedback enviado com sucesso:', response)
+      
+      // Mostrar mensagem de sucesso (você pode substituir por um toast se preferir)
+      alert('✅ Feedback enviado com sucesso!')
+      
+    } catch (error) {
+      console.error('Erro ao enviar feedback:', error)
+      alert('❌ Erro ao enviar feedback. Tente novamente.')
+    }
   }
 
   const clearFilters = () => {
