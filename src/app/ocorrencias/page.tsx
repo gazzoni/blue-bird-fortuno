@@ -14,9 +14,13 @@ import { FeedbackModal } from '@/components/feedback/feedback-modal'
 import { OccurrenceDetails } from '@/components/occurrences/occurrence-details'
 import { InlineStatusEditor } from '@/components/occurrences/inline-status-editor'
 import { InlineDescriptionEditor } from '@/components/occurrences/inline-description-editor'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { useTableResize } from '@/hooks/useTableResize'
+import { useDateRangeFilter } from '@/hooks/useDateRangeFilter'
 import type { Occurrence as OccurrenceFiltersType } from '@/hooks/useOccurrenceFilters'
 import { supabase, updateOccurrenceStatus, updateOccurrenceDescription, updateOccurrenceResolution } from '@/lib/supabase'
+import { DateRange } from 'react-day-picker'
+import { format } from 'date-fns'
 
 // Estado que receberá os dados reais do Supabase
 type Occurrence = OccurrenceFiltersType
@@ -34,6 +38,7 @@ const useSupabaseOccurrences = (
     pageSize: number;
     sortField: SortField;
     sortDirection: SortDirection;
+    dateRange?: DateRange;
   }
 ) => {
   const [occurrences, setOccurrences] = useState<Occurrence[]>([])
@@ -65,6 +70,13 @@ const useSupabaseOccurrences = (
         if (params.search.trim().length > 0) {
           const searchTerm = params.search.trim()
           query = query.or(`occurrence_name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,chat_name.ilike.%${searchTerm}%,client_name.ilike.%${searchTerm}%,key_words.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%`)
+        }
+        
+        // Filtro de data
+        if (params.dateRange?.from && params.dateRange?.to) {
+          const fromDate = format(params.dateRange.from, 'yyyy-MM-dd')
+          const toDate = format(params.dateRange.to, 'yyyy-MM-dd')
+          query = query.gte('created_at', fromDate).lte('created_at', toDate + ' 23:59:59')
         }
 
         const { data, error, count } = await query
@@ -127,6 +139,7 @@ const useSupabaseOccurrences = (
     params.pageSize,
     params.sortField,
     params.sortDirection,
+    params.dateRange,
   ])
 
   return { occurrences, loading, error, totalCount }
@@ -154,6 +167,14 @@ export default function Occurrences() {
   const { columnWidths, handleMouseDown } = useTableResize()
   const pageSize = 50
 
+  // Hook de filtro de data
+  const {
+    dateRange,
+    updateDateRange,
+    clearDateRange,
+    setPresetRange
+  } = useDateRangeFilter()
+
   const { occurrences: fetchedOccurrences, loading, error, totalCount } = useSupabaseOccurrences({
     search,
     status: statusFilter,
@@ -163,6 +184,7 @@ export default function Occurrences() {
     pageSize,
     sortField,
     sortDirection,
+    dateRange,
   })
 
   // Sincronizar dados locais com os fetchados
@@ -172,7 +194,7 @@ export default function Occurrences() {
 
   const occurrences = localOccurrences
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
-  const hasActiveFilters = search !== '' || statusFilter !== 'all' || categoryFilter !== 'all' || squadFilter !== 'all'
+  const hasActiveFilters = search !== '' || statusFilter !== 'all' || categoryFilter !== 'all' || squadFilter !== 'all' || (dateRange && dateRange.from && dateRange.to)
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -298,6 +320,7 @@ export default function Occurrences() {
     setSortField('created_at')
     setSortDirection('desc')
     setPage(1)
+    clearDateRange()
   }
 
   return (
@@ -328,6 +351,18 @@ export default function Occurrences() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col gap-4">
+              {/* Filtro de Data */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Período</label>
+                <DateRangePicker
+                  dateRange={dateRange}
+                  onDateRangeChange={updateDateRange}
+                  onPresetSelect={setPresetRange}
+                  onClear={clearDateRange}
+                  placeholder="Escolher período"
+                />
+              </div>
+
               {/* Campo de busca - largura completa */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Buscar</label>
