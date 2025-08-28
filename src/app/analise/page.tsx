@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Upload, FileText, Download, Loader2, AlertCircle, Eye, Copy } from 'lucide-react'
 import { sendTranscriptToN8n, sendFileToN8n, sendFileToN8nBase64, type N8nResponse } from '@/lib/n8n'
 import { useDocuments } from '@/hooks/useDocuments'
@@ -40,6 +40,9 @@ export default function AnalisePage() {
   const [transcriptText, setTranscriptText] = useState('')
   const [analysisName, setAnalysisName] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  
+  // Ref para o input de arquivo
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Hook para gerenciar documentos reais do banco
   const { documents, loading: documentsLoading, error: documentsError, fetchDocuments } = useDocuments()
@@ -273,9 +276,8 @@ Definir roadmap e prioridades para o primeiro trimestre de 2024.
   const removeFile = () => {
     setSelectedFile(null)
     // Limpar também o input de arquivo para permitir re-seleção do mesmo arquivo
-    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = '';
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   }
 
@@ -299,9 +301,8 @@ Definir roadmap e prioridades para o primeiro trimestre de 2024.
     setTranscriptText('')
     
     // Limpar também o input de arquivo
-    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = '';
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
     
     try {
@@ -612,23 +613,15 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
                     type="file"
                     accept=".mp3,.wav,.mp4,.mov,.txt,.pdf"
                     onChange={handleFileSelect}
-                    className="hidden"
-                    id="file-upload"
-                    ref={(input) => {
-                      if (input) {
-                        // Garantir que o input está acessível
-                        input.style.position = 'absolute';
-                        input.style.left = '-9999px';
-                      }
-                    }}
+                    className="sr-only"
+                    ref={fileInputRef}
                   />
                   <Button 
                     variant="outline" 
                     className="cursor-pointer"
                     onClick={() => {
-                      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-                      if (fileInput) {
-                        fileInput.click();
+                      if (fileInputRef.current) {
+                        fileInputRef.current.click();
                       }
                     }}
                   >
