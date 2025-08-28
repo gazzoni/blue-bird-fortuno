@@ -4,7 +4,13 @@ import type { Company, Occurrence, Message, Group, People } from '@/types/databa
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+})
 
 // Database functions
 export const getCompanies = async (): Promise<Company[]> => {
@@ -91,4 +97,41 @@ export const updateOccurrenceResolution = async (id: number, occurrence_resoluti
     .eq('id', id)
   
   if (error) throw error
+}
+
+// Auth functions
+export const signIn = async (email: string, password: string) => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+  
+  if (error) throw error
+  return data
+}
+
+export const signOut = async () => {
+  const { error } = await supabase.auth.signOut()
+  if (error) throw error
+}
+
+export const getCurrentUser = async () => {
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error) throw error
+  return user
+}
+
+export const updatePassword = async (password: string) => {
+  const { data, error } = await supabase.auth.updateUser({
+    password
+  })
+  
+  if (error) throw error
+  return data
+}
+
+export const getSession = async () => {
+  const { data: { session }, error } = await supabase.auth.getSession()
+  if (error) throw error
+  return session
 }

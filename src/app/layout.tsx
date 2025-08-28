@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/sidebar";
-import { RefreshButton } from "@/components/layout/refresh-button";
-import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { AuthProvider } from "@/contexts/auth-context";
+import { ConditionalLayout } from "@/components/layout/conditional-layout";
 
 
 const geistSans = Geist({
@@ -53,17 +52,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <div className="flex h-screen bg-background">
-          <Sidebar />
-          <main className="flex-1 overflow-auto bg-background lg:ml-0">
-            <div className="lg:hidden h-16 flex items-center px-16 border-b border-border bg-card">
-              {/* Espaço para o botão mobile */}
-            </div>
+        <AuthProvider>
+          <ConditionalLayout>
             {children}
-          </main>
-          <RefreshButton />
-          <InstallPrompt />
-        </div>
+          </ConditionalLayout>
+        </AuthProvider>
       </body>
     </html>
   );
