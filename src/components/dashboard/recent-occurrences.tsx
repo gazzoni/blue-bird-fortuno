@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Eye } from 'lucide-react';
-import { useOccurrenceCharts } from '@/hooks/useOccurrenceCharts';
+import { useOccurrenceCharts, RecentOccurrence } from '@/hooks/useOccurrenceCharts';
 import { OccurrenceDetails } from '@/components/occurrences/occurrence-details';
 import { updateOccurrenceStatus, updateOccurrenceDescription, updateOccurrenceResolution, supabase } from '@/lib/supabase';
 import type { Occurrence } from '@/hooks/useOccurrenceFilters';
@@ -46,7 +46,7 @@ export function RecentOccurrences({ dateRange }: RecentOccurrencesProps) {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const router = useRouter();
 
-  const handleOpenDetails = async (occurrenceData: any) => {
+  const handleOpenDetails = async (occurrenceData: RecentOccurrence) => {
     setLoadingDetails(true);
     setIsDetailsModalOpen(true);
     
@@ -71,10 +71,10 @@ export function RecentOccurrences({ dateRange }: RecentOccurrencesProps) {
           status: fullData.status || 'aberto',
           description: fullData.description || '',
           occurrenceResolution: fullData.occurrence_resolution || '',
-          keyWords: fullData.key_words || '',
+          keywords: fullData.key_words || '',
           messages: fullData.messages || {},
           channel: fullData.channel || '',
-          gateKeeper: fullData.gate_kepper || false,
+          gateKepper: fullData.gate_kepper || false,
           squad: fullData.squad || occurrenceData.squad,
           category: fullData.category || occurrenceData.category,
         };
@@ -94,10 +94,10 @@ export function RecentOccurrences({ dateRange }: RecentOccurrencesProps) {
         status: occurrenceData.status.toLowerCase(),
         description: '',
         occurrenceResolution: '',
-        keyWords: '',
+        keywords: '',
         messages: {},
         channel: '',
-        gateKeeper: false,
+        gateKepper: false,
         squad: occurrenceData.squad,
         category: occurrenceData.category,
       };

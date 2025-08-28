@@ -327,7 +327,7 @@ Definir roadmap e prioridades para o primeiro trimestre de 2024.
             type: 'MEDIA',
             file: currentSelectedFile!
           })
-        } catch (formDataError) {
+        } catch {
           // Fallback: tentar com base64
           response = await sendFileToN8nBase64({
             name: currentAnalysisName,
@@ -517,7 +517,7 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
     try {
       await navigator.clipboard.writeText(text)
       // Mostrar feedback visual de sucesso sem alerts
-    } catch (err) {
+    } catch {
       // Fallback silencioso - não mostrar erro para o usuário
       // pois copiar para clipboard não é crítico
     }

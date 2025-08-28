@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Filter, Eye, AlertTriangle, Clock, CheckCircle, X, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Search, Filter, Eye, AlertTriangle, X, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FeedbackModal } from '@/components/feedback/feedback-modal'
 import { OccurrenceDetails } from '@/components/occurrences/occurrence-details'
@@ -151,7 +151,7 @@ export default function Occurrences() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
   const [localOccurrences, setLocalOccurrences] = useState<Occurrence[]>([])
-  const { columnWidths, handleMouseDown, isResizing } = useTableResize()
+  const { columnWidths, handleMouseDown } = useTableResize()
   const pageSize = 50
 
   const { occurrences: fetchedOccurrences, loading, error, totalCount } = useSupabaseOccurrences({

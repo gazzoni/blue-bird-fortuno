@@ -41,7 +41,7 @@ const getStatusBadge = (status: string, isEditing: boolean = false) => {
   }
 }
 
-const getStatusOptions = (currentStatus: string) => {
+const getStatusOptions = () => {
   const options = [
     { value: 'aberto', label: 'Aberto', icon: Clock },
     { value: 'resolvido', label: 'Resolvido', icon: CheckCircle }
@@ -134,7 +134,7 @@ export function InlineStatusEditor({
               handleCancel()
             }}
           >
-            {getStatusOptions(currentStatus).map((option) => {
+            {getStatusOptions().map((option) => {
               const Icon = option.icon
               return (
                 <SelectItem 
