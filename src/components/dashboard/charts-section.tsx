@@ -90,7 +90,7 @@ interface ChartsSectionProps {
 }
 
 export function ChartsSection({ dateRange }: ChartsSectionProps) {
-  const { lineChartData, statusByDayData, squadChartData, clientChartData, loading, error } = useOccurrenceCharts(dateRange);
+  const { lineChartData, statusByDayData, squadChartData, categoryChartData, clientChartData, loading, error } = useOccurrenceCharts(dateRange);
 
   if (error) {
     return (
@@ -133,9 +133,7 @@ export function ChartsSection({ dateRange }: ChartsSectionProps) {
 
   return (
     <div className="space-y-6">
-      {/* First Row: Original charts */}
-    <div className="grid gap-4 md:grid-cols-2">
-      {/* Total Line Chart - Padrão shadcn/ui */}
+      {/* First Row: Total Chart - Full Width */}
       <Card className="min-h-[500px]">
         <CardHeader>
           <CardTitle>Total de Ocorrências</CardTitle>
@@ -216,8 +214,11 @@ export function ChartsSection({ dateRange }: ChartsSectionProps) {
         </CardFooter>
       </Card>
 
-      {/* Status Stacked Bar Chart */}
-      <Card className="min-h-[500px]">
+      {/* Second Row: Status and Category Charts */}
+      <div className="grid gap-4 md:grid-cols-2">
+
+        {/* Status Stacked Bar Chart */}
+        <Card className="min-h-[500px]">
         <CardHeader>
           <CardTitle>Ocorrências por Status</CardTitle>
           <CardDescription>Status das ocorrências por dia</CardDescription>
@@ -296,10 +297,102 @@ export function ChartsSection({ dateRange }: ChartsSectionProps) {
             Mostrando status aberto e resolvido por dia
           </div>
         </CardFooter>
-      </Card>
+        </Card>
+
+        {/* Category Line Chart - Novo */}
+        <Card className="min-h-[500px]">
+          <CardHeader>
+            <CardTitle>Ocorrências por Categoria</CardTitle>
+            <CardDescription>Evolução das categorias por período</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[400px]">
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-muted-foreground">Carregando gráfico...</div>
+              </div>
+            ) : (
+              <ChartContainer config={chartConfigLine}>
+                <LineChart
+                  accessibilityLayer
+                  data={categoryChartData}
+                  margin={{
+                    top: 24,
+                    left: 24,
+                    right: 24,
+                  }}
+                >
+                  <CartesianGrid vertical={true} horizontal={true} strokeOpacity={0.2} />
+                  <YAxis 
+                    domain={[-1, (dataMax: number) => dataMax + 1]}
+                    tick={{ fontSize: 0 }}
+                    axisLine={false}
+                    tickCount={10}
+                    width={0}
+                  />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const date = payload[0]?.payload?.date || label;
+                        return (
+                          <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+                            <p className="text-popover-foreground font-medium">{date}</p>
+                            {payload.map((entry, index) => (
+                              <p key={index} className="text-muted-foreground">
+                                {`${entry.name}: ${entry.value}`}
+                              </p>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  {categoryChartData.length > 0 && Object.keys(categoryChartData[0])
+                    .filter(key => key !== 'date')
+                    .map((category, index) => {
+                      // Cores dinâmicas para diferentes categorias
+                      const colors = ['#0ea5e9', '#0284c7', '#0369a1', '#075985', '#0c4a6e', '#164e63'];
+                      const color = colors[index % colors.length];
+                      
+                      return (
+                        <Line
+                          key={category}
+                          dataKey={category}
+                          type="natural"
+                          stroke={color}
+                          strokeWidth={2}
+                          dot={({ payload, ...props }) => {
+                            return (
+                              <Dot
+                                key={`${payload.date}-${category}`}
+                                r={4}
+                                cx={props.cx}
+                                cy={props.cy}
+                                fill={color}
+                                stroke={color}
+                              />
+                            )
+                          }}
+                        />
+                      );
+                    })
+                  }
+                </LineChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+          <CardFooter className="flex-col items-start gap-2 text-sm">
+            <div className="flex gap-2 leading-none font-medium">
+              Evolução das categorias por período <TrendingUp className="h-4 w-4" />
+            </div>
+            <div className="text-muted-foreground leading-none">
+              Mostrando todas as categorias de ocorrências
+            </div>
+          </CardFooter>
+        </Card>
       </div>
 
-      {/* Second Row: New charts */}
+      {/* Third Row: Squad and Client Charts */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         {/* Squad Line Chart - Padrão shadcn/ui */}
         <Card className="min-h-[500px]">

@@ -11,7 +11,7 @@ export function useTableResize() {
     client_name: 200,
     status: 130, // Aumentado 5% (100px + 5px)
     category: 130,
-    squad: 130,
+    squad: 200,
     chat_name: 300, // Dobrado de 150px para 300px
     resolution: 300, // Maior para resolução
     keywords: 500, // Triplicado de 160px para 480px

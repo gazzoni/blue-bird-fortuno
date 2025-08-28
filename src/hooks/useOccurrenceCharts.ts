@@ -25,6 +25,11 @@ export interface SquadDataPoint {
   'Força Tática Financeira': number;
 }
 
+export interface CategoryDataPoint {
+  date: string;
+  [category: string]: string | number;
+}
+
 export interface ClientDataPoint {
   client: string;
   total: number;
@@ -43,6 +48,7 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
   const [lineChartData, setLineChartData] = useState<ChartDataPoint[]>([]);
   const [statusByDayData, setStatusByDayData] = useState<StatusByDayDataPoint[]>([]);
   const [squadChartData, setSquadChartData] = useState<SquadDataPoint[]>([]);
+  const [categoryChartData, setCategoryChartData] = useState<CategoryDataPoint[]>([]);
   const [clientChartData, setClientChartData] = useState<ClientDataPoint[]>([]);
   const [recentOccurrences, setRecentOccurrences] = useState<RecentOccurrence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +64,7 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
       // Fetch occurrences by day for line chart using regular query
       const { data: rawData, error: rawError } = await supabase
         .from('new-occurrences')
-        .select('created_at, squad, client_name, status')
+        .select('created_at, squad, client_name, status, category')
         .gte('created_at', fromDate)
         .lte('created_at', toDate)
         .order('created_at');
@@ -68,6 +74,7 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
       let formattedLineData: ChartDataPoint[] = [];
       let formattedStatusByDayData: StatusByDayDataPoint[] = [];
       let formattedSquadData: SquadDataPoint[] = [];
+      let formattedCategoryData: CategoryDataPoint[] = [];
       let formattedClientData: ClientDataPoint[] = [];
       
       if (!rawError && rawData) {
@@ -75,6 +82,7 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
         const dateGroups: { [key: string]: number } = {};
         const statusDateGroups: { [key: string]: { [status: string]: number } } = {};
         const squadDateGroups: { [key: string]: { [squad: string]: number } } = {};
+        const categoryDateGroups: { [key: string]: { [category: string]: number } } = {};
         const clientGroups: { [key: string]: number } = {};
         
         rawData.forEach(item => {
@@ -99,6 +107,13 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
           }
           const squad = item.squad || 'Sem Squad';
           squadDateGroups[date][squad] = (squadDateGroups[date][squad] || 0) + 1;
+          
+          // Por categoria e data
+          if (!categoryDateGroups[date]) {
+            categoryDateGroups[date] = {};
+          }
+          const category = item.category || 'Sem Categoria';
+          categoryDateGroups[date][category] = (categoryDateGroups[date][category] || 0) + 1;
           
           // Por cliente
           const client = item.client_name || 'Cliente não identificado';
@@ -148,6 +163,28 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
             return dateA.getTime() - dateB.getTime();
           });
 
+        // Category data - dinamicamente criar as categorias
+        const allCategories = new Set<string>();
+        Object.values(categoryDateGroups).forEach(categories => {
+          Object.keys(categories).forEach(category => allCategories.add(category));
+        });
+
+        formattedCategoryData = Object.entries(categoryDateGroups)
+          .map(([date, categories]) => {
+            const result: CategoryDataPoint = { date };
+            allCategories.forEach(category => {
+              result[category] = categories[category] || 0;
+            });
+            return result;
+          })
+          .sort((a, b) => {
+            const [dayA, monthA] = a.date.split('/');
+            const [dayB, monthB] = b.date.split('/');
+            const dateA = new Date(2024, parseInt(monthA) - 1, parseInt(dayA));
+            const dateB = new Date(2024, parseInt(monthB) - 1, parseInt(dayB));
+            return dateA.getTime() - dateB.getTime();
+          });
+
         // Client data (top 10)
         formattedClientData = Object.entries(clientGroups)
           .map(([client, total]) => ({ client, total }))
@@ -183,6 +220,7 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
       setLineChartData(formattedLineData);
       setStatusByDayData(formattedStatusByDayData);
       setSquadChartData(formattedSquadData);
+      setCategoryChartData(formattedCategoryData);
       setClientChartData(formattedClientData);
       setRecentOccurrences(formattedRecentData);
     } catch (err) {
@@ -191,6 +229,7 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
       setLineChartData([]);
       setStatusByDayData([]);
       setSquadChartData([]);
+      setCategoryChartData([]);
       setClientChartData([]);
       setRecentOccurrences([]);
     } finally {
@@ -206,6 +245,7 @@ export function useOccurrenceCharts(dateRange?: { from?: Date; to?: Date }) {
     lineChartData, 
     statusByDayData, 
     squadChartData,
+    categoryChartData,
     clientChartData,
     recentOccurrences, 
     loading, 

@@ -1,10 +1,16 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Eye } from 'lucide-react';
 import { useOccurrenceCharts } from '@/hooks/useOccurrenceCharts';
+import { OccurrenceDetails } from '@/components/occurrences/occurrence-details';
+import { updateOccurrenceStatus, updateOccurrenceDescription, updateOccurrenceResolution, supabase } from '@/lib/supabase';
+import type { Occurrence } from '@/hooks/useOccurrenceFilters';
 
 const statusColors = {
   'aberto': 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -35,6 +41,100 @@ interface RecentOccurrencesProps {
 
 export function RecentOccurrences({ dateRange }: RecentOccurrencesProps) {
   const { recentOccurrences, loading, error } = useOccurrenceCharts(dateRange);
+  const [selectedOccurrence, setSelectedOccurrence] = useState<Occurrence | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const router = useRouter();
+
+  const handleOpenDetails = async (occurrenceData: any) => {
+    setLoadingDetails(true);
+    setIsDetailsModalOpen(true);
+    
+    try {
+      // Buscar dados completos da ocorrência
+      const { data: fullData, error } = await supabase
+        .from('new-occurrences')
+        .select('*')
+        .eq('id', occurrenceData.id)
+        .single();
+
+      if (error) throw error;
+
+      if (fullData) {
+        const fullOccurrence: Occurrence = {
+          id: fullData.id,
+          createdAt: fullData.created_at,
+          chatId: fullData.chat_id || '',
+          chatName: fullData.chat_name || occurrenceData.chat_name,
+          clientName: fullData.client_name || '',
+          occurrenceName: fullData.occurrence_name || '',
+          status: fullData.status || 'aberto',
+          description: fullData.description || '',
+          occurrenceResolution: fullData.occurrence_resolution || '',
+          keyWords: fullData.key_words || '',
+          messages: fullData.messages || {},
+          channel: fullData.channel || '',
+          gateKeeper: fullData.gate_kepper || false,
+          squad: fullData.squad || occurrenceData.squad,
+          category: fullData.category || occurrenceData.category,
+        };
+        
+        setSelectedOccurrence(fullOccurrence);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar detalhes da ocorrência:', error);
+      // Fallback para dados básicos se houver erro
+      const basicOccurrence: Occurrence = {
+        id: occurrenceData.id,
+        createdAt: occurrenceData.created_at,
+        chatId: '',
+        chatName: occurrenceData.chat_name,
+        clientName: '',
+        occurrenceName: '',
+        status: occurrenceData.status.toLowerCase(),
+        description: '',
+        occurrenceResolution: '',
+        keyWords: '',
+        messages: {},
+        channel: '',
+        gateKeeper: false,
+        squad: occurrenceData.squad,
+        category: occurrenceData.category,
+      };
+      setSelectedOccurrence(basicOccurrence);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const handleStatusUpdate = async (occurrenceId: number, newStatus: string) => {
+    try {
+      await updateOccurrenceStatus(occurrenceId, newStatus);
+      // Recarregar dados seria ideal aqui, mas por simplicidade vamos atualizar localmente
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+    }
+  };
+
+  const handleDescriptionUpdate = async (occurrenceId: number, newDescription: string) => {
+    try {
+      await updateOccurrenceDescription(occurrenceId, newDescription);
+    } catch (error) {
+      console.error('Erro ao atualizar descrição:', error);
+    }
+  };
+
+  const handleResolutionUpdate = async (occurrenceId: number, newResolution: string) => {
+    try {
+      await updateOccurrenceResolution(occurrenceId, newResolution);
+    } catch (error) {
+      console.error('Erro ao atualizar resolução:', error);
+    }
+  };
+
+  const handleViewAllOccurrences = () => {
+    router.push('/ocorrencias');
+  };
 
   if (error) {
     return (
@@ -119,10 +219,7 @@ export function RecentOccurrences({ dateRange }: RecentOccurrencesProps) {
                     variant="ghost"
                     size="sm"
                     className="text-gray-500 hover:text-black"
-                    onClick={() => {
-                      // TODO: Implementar navegação para detalhes
-                      console.log('Ver detalhes da ocorrência:', occurrence.id);
-                    }}
+                    onClick={() => handleOpenDetails(occurrence)}
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -137,16 +234,31 @@ export function RecentOccurrences({ dateRange }: RecentOccurrencesProps) {
             <Button
               variant="outline"
               className="text-black border-gray-300 hover:bg-gray-50"
-              onClick={() => {
-                // TODO: Implementar navegação para página de ocorrências
-                console.log('Ver todas as ocorrências');
-              }}
+              onClick={handleViewAllOccurrences}
             >
               Ver todas as ocorrências
             </Button>
           </div>
         )}
       </CardContent>
+
+      {/* Modal de Detalhes */}
+      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+          {loadingDetails ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-muted-foreground">Carregando detalhes...</div>
+            </div>
+          ) : selectedOccurrence ? (
+            <OccurrenceDetails
+              occurrence={selectedOccurrence}
+              onStatusUpdate={handleStatusUpdate}
+              onDescriptionUpdate={handleDescriptionUpdate}
+              onResolutionUpdate={handleResolutionUpdate}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

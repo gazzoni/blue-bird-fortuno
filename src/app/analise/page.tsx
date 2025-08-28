@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Upload, FileText, Download, Loader2, AlertCircle, Eye, Copy } from 'lucide-react'
-import { sendTranscriptToN8n, sendFileToN8n, type N8nResponse } from '@/lib/n8n'
+import { sendTranscriptToN8n, sendFileToN8n, sendFileToN8nBase64, type N8nResponse } from '@/lib/n8n'
 import { useDocuments } from '@/hooks/useDocuments'
 import type { Document } from '@/types/database'
 import { Header } from '@/components/layout/header'
@@ -39,6 +39,7 @@ export default function AnalisePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [transcriptText, setTranscriptText] = useState('')
   const [analysisName, setAnalysisName] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
   
   // Hook para gerenciar documentos reais do banco
   const { documents, loading: documentsLoading, error: documentsError, fetchDocuments } = useDocuments()
@@ -223,18 +224,59 @@ Definir roadmap e prioridades para o primeiro trimestre de 2024.
     setDragActive(false)
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0])
+      const file = e.dataTransfer.files[0]
+      
+      // Validar tamanho do arquivo (500MB máximo)
+      const maxSize = 500 * 1024 * 1024 // 500MB em bytes
+      if (file.size > maxSize) {
+        alert(`⚠️ Arquivo muito grande!\n\nTamanho: ${(file.size / 1024 / 1024).toFixed(1)} MB\nMáximo permitido: 500 MB\n\nPor favor, selecione um arquivo menor.`)
+        return
+      }
+      
+      // Validar tipo de arquivo
+      const allowedTypes = ['.mp3', '.wav', '.mp4', '.mov', '.txt', '.pdf']
+      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+      
+      if (!allowedTypes.includes(fileExtension)) {
+        alert(`⚠️ Formato de arquivo não suportado!\n\nArquivo: ${file.name}\nFormatos aceitos: MP3, WAV, MP4, MOV, TXT, PDF`)
+        return
+      }
+      
+      setSelectedFile(file)
     }
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
+      const file = e.target.files[0]
+      
+      // Validar tamanho do arquivo (500MB máximo)
+      const maxSize = 500 * 1024 * 1024 // 500MB em bytes
+      if (file.size > maxSize) {
+        alert(`⚠️ Arquivo muito grande!\n\nTamanho: ${(file.size / 1024 / 1024).toFixed(1)} MB\nMáximo permitido: 500 MB\n\nPor favor, selecione um arquivo menor.`)
+        return
+      }
+      
+      // Validar tipo de arquivo
+      const allowedTypes = ['.mp3', '.wav', '.mp4', '.mov', '.txt', '.pdf']
+      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+      
+      if (!allowedTypes.includes(fileExtension)) {
+        alert(`⚠️ Formato de arquivo não suportado!\n\nArquivo: ${file.name}\nFormatos aceitos: MP3, WAV, MP4, MOV, TXT, PDF`)
+        return
+      }
+      
+      setSelectedFile(file)
     }
   }
 
   const removeFile = () => {
     setSelectedFile(null)
+    // Limpar também o input de arquivo para permitir re-seleção do mesmo arquivo
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
   }
 
   const handleSubmitAnalysis = async () => {
@@ -244,44 +286,78 @@ Definir roadmap e prioridades para o primeiro trimestre de 2024.
     
     if (!hasName || (!hasFile && !hasText)) return
 
+    setIsUploading(true)
+    
+    // Limpar formulário imediatamente após iniciar o envio
+    const currentAnalysisName = analysisName.trim()
+    const currentTranscriptText = transcriptText
+    const currentSelectedFile = selectedFile
+    
+    // Limpar estados imediatamente
+    setAnalysisName('')
+    setSelectedFile(null)
+    setTranscriptText('')
+    
+    // Limpar também o input de arquivo
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+    
     try {
       // Enviar para n8n baseado no método de input
       let response: N8nResponse
       
       if (inputMethod === 'text') {
         response = await sendTranscriptToN8n({
-          name: analysisName.trim(),
+          name: currentAnalysisName,
           type: 'TRANSCRIPT',
-          transcript: transcriptText
+          transcript: currentTranscriptText
         })
       } else {
-        response = await sendFileToN8n({
-          name: analysisName.trim(),
-          type: 'MEDIA',
-          file: selectedFile!
-        })
+        // Verificar se o arquivo ainda é válido antes de enviar
+        if (!currentSelectedFile || currentSelectedFile.size === 0) {
+          throw new Error('Arquivo inválido ou perdido durante o processo')
+        }
+        
+        try {
+          // Tentar primeiro com FormData
+          response = await sendFileToN8n({
+            name: currentAnalysisName,
+            type: 'MEDIA',
+            file: currentSelectedFile!
+          })
+        } catch (formDataError) {
+          // Fallback: tentar com base64
+          response = await sendFileToN8nBase64({
+            name: currentAnalysisName,
+            type: 'MEDIA',
+            file: currentSelectedFile!
+          })
+        }
       }
-      
-      console.log('Enviado para n8n com sucesso:', response)
       
       // Mostrar feedback de sucesso
       if (response.status === 'running') {
         alert(`✅ Análise iniciada com sucesso!\nID: ${response.id}\n\nO documento aparecerá na lista abaixo como "Processando" e será atualizado automaticamente quando concluído.`)
         
-        // Limpar formulário
-        setAnalysisName('')
-        setSelectedFile(null)
-        setTranscriptText('')
-        
         // Força refresh da lista de documentos para mostrar o novo documento
         fetchDocuments()
       } else {
-        alert(`⚠️ Status inesperado: ${response.status}\n${response.message}`)
+        alert(`⚠️ Status inesperado: ${response.status}\n${response.message || 'Sem detalhes adicionais'}`)
       }
       
     } catch (error) {
-      console.error('Erro ao enviar para n8n:', error)
-      alert('❌ Erro ao enviar dados para processamento. Tente novamente.')
+      // Em caso de erro, restaurar os valores no formulário
+      setAnalysisName(currentAnalysisName)
+      setSelectedFile(currentSelectedFile)
+      setTranscriptText(currentTranscriptText)
+      
+      // Mostrar erro mais detalhado
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      alert(`❌ Erro ao enviar dados para processamento:\n${errorMessage}\n\nTente novamente.`)
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -440,11 +516,14 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      // Aqui você pode adicionar uma notificação de sucesso
+      // Mostrar feedback visual de sucesso sem alerts
     } catch (err) {
-      console.error('Erro ao copiar:', err)
+      // Fallback silencioso - não mostrar erro para o usuário
+      // pois copiar para clipboard não é crítico
     }
   }
+
+
 
   // getLoadingMessage removido - modal de loading não é mais usado
 
@@ -509,40 +588,57 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
           {/* Upload de Arquivo */}
           {inputMethod === 'file' && (
             <div className="space-y-4">
-              <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                  dragActive 
-                    ? 'border-sky-500 bg-sky-50' 
-                    : 'border-gray-300 hover:border-gray-400'
-                }`}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-              >
-                <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-lg font-medium text-gray-700 mb-2">
-                  Arraste e solte seu arquivo aqui
-                </p>
-                <p className="text-gray-500 mb-4">
-                  ou clique para selecionar arquivo
-                </p>
-                <Input
-                  type="file"
-                  accept=".mp3,.wav,.mp4,.mov,.txt,.pdf"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <Label htmlFor="file-upload">
-                  <Button variant="outline" className="cursor-pointer">
+              {/* Mostrar área de upload apenas se não houver arquivo selecionado */}
+              {!selectedFile && (
+                <div
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    dragActive 
+                      ? 'border-sky-500 bg-sky-50' 
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                >
+                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-gray-700 mb-2">
+                    Arraste e solte seu arquivo aqui
+                  </p>
+                  <p className="text-gray-500 mb-4">
+                    ou clique no botão abaixo para selecionar
+                  </p>
+                  <Input
+                    type="file"
+                    accept=".mp3,.wav,.mp4,.mov,.txt,.pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="file-upload"
+                    ref={(input) => {
+                      if (input) {
+                        // Garantir que o input está acessível
+                        input.style.position = 'absolute';
+                        input.style.left = '-9999px';
+                      }
+                    }}
+                  />
+                  <Button 
+                    variant="outline" 
+                    className="cursor-pointer"
+                    onClick={() => {
+                      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+                      if (fileInput) {
+                        fileInput.click();
+                      }
+                    }}
+                  >
                     Selecionar Arquivo
                   </Button>
-                </Label>
-                <p className="text-xs text-gray-400 mt-2">
-                  Formatos: MP3, WAV, MP4, MOV, TXT, PDF (máx. 100MB)
+                                  <p className="text-xs text-gray-400 mt-2">
+                  Formatos: MP3, WAV, MP4, MOV, TXT, PDF (máx. 500MB)
                 </p>
-              </div>
+                </div>
+              )}
 
               {/* Arquivo Selecionado */}
               {selectedFile && (
@@ -593,13 +689,23 @@ Resumo final dos pontos mais importantes e direcionamentos sugeridos.
             onClick={handleSubmitAnalysis}
             className="w-full bg-sky-500 hover:bg-sky-600"
             disabled={
+              isUploading ||
               !analysisName.trim() ||
               (inputMethod === 'file' && !selectedFile) || 
               (inputMethod === 'text' && transcriptText.trim() === '')
             }
           >
-            <FileText className="h-4 w-4 mr-2" />
-            Gerar Análise
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {inputMethod === 'file' ? 'Enviando arquivo...' : 'Processando texto...'}
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4 mr-2" />
+                Gerar Análise
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
